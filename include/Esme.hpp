@@ -49,21 +49,23 @@ typedef enum thread_status{
 }thread_status_t;
 
 class Esme{
+	public: 
+		enum STATE{
+			ST_IDLE,
+			ST_CONNECTED,
+			ST_DISCONNECTED,
+			ST_BIND,
+			ST_BIND_FAIL,
+			ST_UNBIND,
+			ST_UNBIND_FAIL,
+		};
 	private:
 		// smsc details 
 		std::string host;
 		int port;
 		int smscSocket;
 		struct sockaddr_in smscInfo;
-		enum STATE{
-			IDLE,
-			CONNECTED,
-			DISCONNECTED,
-			BIND,
-			BIND_FAIL,
-			UNBIND,
-			UNBIND_FAIL,
-		} state;
+		enum STATE state;
 		bool isLive;
 		// Data structures to maintain temp sms // avoid db interaction
 		std::map<int64_t, sms_data_t> sendSmsMap;
@@ -83,8 +85,6 @@ class Esme{
 		pthread_t linkThId;
 		thread_status_t linkThStatus;
 		static void *LinkCheckThread(void *);
-		int StartLinkCheck(void);
-		int StopLinkCheck(void);
 		int SendEnquireLink(void);
 		// OnReceivePduThread
 		pthread_t pduProcessThId;
@@ -100,6 +100,7 @@ class Esme{
 		Smpp::Uint32 GetNewSequenceNumber(void);
 		int OpenConnection(std::string host=DFL_SMPP_URL, uint32_t port=DFL_SMPP_PORT);
 		int CloseConnection(void);
+		enum STATE GetEsmeState(void);
 		int Write(NetBuffer &); // Just Write all Bytes
 		int Read(NetBuffer &); // Frammer will be implemented here 
 		int Bind(Smpp::SystemId sysId, Smpp::Password pass, uint8_t bindType);
@@ -110,8 +111,11 @@ class Esme{
 		int StopReader(void);
 		int StartPduProcess(void);
 		int StopPduProcess(void);
+		int StartLinkCheck(void);
+		int StopLinkCheck(void);
 		thread_status_t GetPduProcessThStatus(void);
 		thread_status_t GetRcvThStatus(void);
+		thread_status_t GetEnquireLinkThStatus(void);
 };
 #endif
 

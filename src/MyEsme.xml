@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <MyEsme>
+	<logger>
+		<path>/var/log/myesme</path>
+		<name>myesme</name>
+		<tag>ESME</tag>
+		<level>8</level>
+		<interval>3600</interval>
+	</logger>
+	<mysql>
+		<ip>127.0.0.1</ip>
+		<port>3306</port>
+		<user>root</user>
+		<password>padmapur</password>
+		<name>testdatabase</name>
+	</mysql>
+	<smsc>
+		<ip>127.0.0.1</ip>
+		<port>2775</port>
+	</smsc>
 	<bind>
 		<system_id>smppclient1</system_id>
 		<password>password</password>
@@ -7,6 +25,7 @@
 		<interface_version>5.0</interface_version>
 		<ton>0</ton>
 		<npi>0</npi>
-		<address_range>null</address_range>
+		<address_range></address_range>
 	</bind>
+
 </MyEsme>

@@ -33,7 +33,7 @@ libsmppapputil_la_LDFLAGS = -shared -fPIC ${libxml2_LIBS} `mysql_config --libs`
 
 bin_PROGRAMS = myesme 
 myesme_SOURCES = testesme.cpp Esme.cpp EsmeConfig.cpp Externs.cpp 
-myesme_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS}
-myesme_LDFLAGS = ${libxml2_LIBS} libsmpp.la libsmppapputil.la -lpthread
+myesme_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS} -std=c++11 `mysql_config --cflags`
+myesme_LDFLAGS = ${libxml2_LIBS} libsmpp.la libsmppapputil.la -lpthread `mysql_config --libs`
 
 sysconf_DATA = MyEsme.xml 

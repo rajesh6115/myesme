@@ -2,12 +2,22 @@
 #define _ESME_CONFIG_H_
 #include <iostream>
 #include <cstring>
+#include <cstdint>
 #include "appconfig.hpp"
 #include "smpp.hpp"
 
 class EsmeConfig{
 	private:
 	appconfig_p myconfig;
+	// Logger
+	std::string path;
+	std::string name;
+	std::string tag;
+	uint32_t level;
+	uint32_t interval;
+	// Connect
+	std::string ip;
+	uint32_t port;
         // BIND 
         Smpp::SystemId bindSysId;
         Smpp::Password bindPass;
@@ -23,6 +33,15 @@ class EsmeConfig{
         EsmeConfig(const char *cfgFile=NULL);
         ~EsmeConfig(void);
         int Load(const char *cfgFile );
+	std::string& GetLogPath(void);
+	std::string& GetLogName(void);
+	std::string& GetLogTag(void);
+	uint32_t GetLogLevel(void);
+	uint32_t GetLogInterval(void);
+	// SMSC
+	std::string& GetSmscIp(void);
+	uint32_t GetSmscPort(void);
+
         Smpp::SystemId GetSystemId(void);
         Smpp::Password GetPassword(void);
         Smpp::SystemType GetSystemType(void);

@@ -8,7 +8,7 @@ Esme::Esme(std::string host, uint32_t port){
 	this->port = port;
 	smscSocket = -1;
 	bzero(&smscInfo, sizeof(struct sockaddr_in));
-	state = IDLE;
+	state = ST_IDLE;
 	isLive = false;
 	
 }
@@ -34,6 +34,10 @@ int Esme::OpenConnection(std::string host, uint32_t portno){
 		// Log Error
 		return -1;
 	}
+	// Decide on Some Condition
+	this->host = host;
+	this->port = portno; 
+	std::cout << "host=" << host << ":port=" << portno << std::endl;
 	smscInfo.sin_family = PF_INET;
 	smscInfo.sin_port = htons(this->port);
 	smscInfo.sin_addr.s_addr = inet_addr(this->host.c_str());
@@ -41,6 +45,7 @@ int Esme::OpenConnection(std::string host, uint32_t portno){
 		// Log Error
 		return -1;
 	}
+	state = ST_CONNECTED;
 	return 0;
 }
 
@@ -50,7 +55,12 @@ int Esme::CloseConnection(void){
 		// Even this fail we can close socket descriptor
 	}
 	close(smscSocket);
+	state = ST_DISCONNECTED;
 	return 0;
+}
+
+enum Esme::STATE Esme::GetEsmeState(void){
+	return state;
 }
 
 int Esme::RegisterPdu(NetBuffer &tmpNetBuf){
@@ -101,7 +111,7 @@ int Esme::Read(NetBuffer &robj){
 	if(readBytes >= 4){ 
 	// read require bytes and re-initise requireBytes
 		requireBytes = Smpp::get_command_length(readBuffer);
-		std::cout << "Require Bytes= " << requireBytes << std::endl;
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Require Bytes= %d", requireBytes);
 	}
 	while(requireBytes>0){
 		if(readBytes == -1){
@@ -120,6 +130,7 @@ int Esme::Read(NetBuffer &robj){
 			}
 		}
 	}
+	//robj.PrintHexDump();
 	return robj.GetLength();
 }
 
@@ -133,8 +144,11 @@ int Esme::Bind(Smpp::SystemId sysId, Smpp::Password pass, uint8_t bindType){
 			pdu.sequence_number(GetNewSequenceNumber());
 			pdu.system_id(sysId);
 			pdu.password(pass);
-		//	pdu.system_type(CG_MyAppConfig.getSystemType());
-		//	pdu.interface_version(CG_MyAppConfig.getSmppVersion());
+			pdu.system_type(CG_MyAppConfig.GetSystemType());
+			pdu.interface_version(CG_MyAppConfig.GetInterfaceVersion());
+			pdu.addr_ton(CG_MyAppConfig.GetTon());
+			pdu.addr_npi(CG_MyAppConfig.GetNpi());
+			pdu.address_range(CG_MyAppConfig.GetAddressRange());
 			data = (Smpp::Uint8*) pdu.encode();
 			nwData.Append(data, pdu.command_length());
 			
@@ -146,8 +160,11 @@ int Esme::Bind(Smpp::SystemId sysId, Smpp::Password pass, uint8_t bindType){
 			pdu.sequence_number(GetNewSequenceNumber());
 			pdu.system_id(sysId);
 			pdu.password(pass);
-		//	pdu.system_type(CG_MyAppConfig.getSystemType());
-		//	pdu.interface_version(CG_MyAppConfig.getSmppVersion());
+			pdu.system_type(CG_MyAppConfig.GetSystemType());
+			pdu.interface_version(CG_MyAppConfig.GetInterfaceVersion());
+			pdu.addr_ton(CG_MyAppConfig.GetTon());
+			pdu.addr_npi(CG_MyAppConfig.GetNpi());
+			//pdu.address_range(CG_MyAppConfig.GetAddressRange());  // address range should be null
 			data = (Smpp::Uint8*) pdu.encode();
 			nwData.Append(data, pdu.command_length());
 		}
@@ -158,8 +175,11 @@ int Esme::Bind(Smpp::SystemId sysId, Smpp::Password pass, uint8_t bindType){
 			pdu.sequence_number(GetNewSequenceNumber());
 			pdu.system_id(sysId);
 			pdu.password(pass);
-		//	pdu.system_type(CG_MyAppConfig.getSystemType());
-		//	pdu.interface_version(CG_MyAppConfig.getSmppVersion());
+			pdu.system_type(CG_MyAppConfig.GetSystemType());
+			pdu.interface_version(CG_MyAppConfig.GetInterfaceVersion());
+			pdu.addr_ton(CG_MyAppConfig.GetTon());
+			pdu.addr_npi(CG_MyAppConfig.GetNpi());
+			pdu.address_range(CG_MyAppConfig.GetAddressRange());
 			data = (Smpp::Uint8*) pdu.encode();
 			nwData.Append(data, pdu.command_length());
 		}
@@ -204,7 +224,7 @@ int Esme::SendSubmitSm(const Smpp::Char *srcAddr, const Smpp::Char *destAddr, ui
 		// Use TLV to Send SMS
 		std::cout << "Length Is More So Insert with tlv" << std::endl;
 	}
-	pdu.registered_delivery(0x03);
+	pdu.registered_delivery(0x01);
 	nwData.Append(pdu.encode(), pdu.command_length());
 	RegisterPdu(nwData);
 	return Write(nwData);
@@ -236,6 +256,10 @@ int Esme::StopLinkCheck(void){
 	return 0;
 }
 
+thread_status_t Esme::GetEnquireLinkThStatus(void){
+	return linkThStatus;
+}
+
 void *Esme::LinkCheckThread(void *arg){
 	if(arg == NULL){
 		return NULL;
@@ -244,7 +268,6 @@ void *Esme::LinkCheckThread(void *arg){
 	std::cout << "Link Check Thread Started" << std::endl;
 	objAddr->linkThStatus = TH_ST_RUNNING;
 	while(objAddr->linkThStatus == TH_ST_RUNNING){
-		// Send Enquire Link in Regular Interval
 		// And Check Live Timer for time out
 		// Start Live Timer
 		objAddr->SendEnquireLink();
@@ -326,6 +349,8 @@ void *Esme::ThOnReceivePdu(void *arg){
 						APP_LOGGER(CG_MyAppLogger, LOG_INFO, "SMSCID=%s", smscId.c_str());
 						// Remove from Map As Sucessfully Response We Got
 						objAddr->UnRegisterPdu(tmpNetBuf);
+						// check status and change state
+						objAddr->state = ST_BIND;
 					}
 					break;
 				case Smpp::CommandId::BindTransmitterResp:
@@ -336,6 +361,8 @@ void *Esme::ThOnReceivePdu(void *arg){
 						std::string smscId = resp.system_id();
 						APP_LOGGER(CG_MyAppLogger, LOG_INFO, "SMSCID=%s", smscId.c_str());
 						objAddr->UnRegisterPdu(tmpNetBuf);
+						// check status and change state
+						objAddr->state = ST_BIND;
 					}
 					break;
 				case Smpp::CommandId::BindTransceiverResp:
@@ -345,6 +372,8 @@ void *Esme::ThOnReceivePdu(void *arg){
 						std::string smscId = resp.system_id();
 						APP_LOGGER(CG_MyAppLogger, LOG_INFO, "SMSCID=%s", smscId.c_str());
 						objAddr->UnRegisterPdu(tmpNetBuf);
+						// check status and change state
+						objAddr->state = ST_BIND;
 					}
 					break;
 				case Smpp::CommandId::UnbindResp:
@@ -352,6 +381,8 @@ void *Esme::ThOnReceivePdu(void *arg){
 						// Change State
 						std::cout << "Bind Unbind Response" << std::endl;
 						objAddr->UnRegisterPdu(tmpNetBuf);
+						// check status and change state
+						objAddr->state = ST_UNBIND;
 					}
 					break;
 				case Smpp::CommandId::EnquireLinkResp:
@@ -394,6 +425,38 @@ void *Esme::ThOnReceivePdu(void *arg){
 					break;
 				case Smpp::CommandId::DataSmResp:
 					{// unregister data sm 
+					}
+					break;
+				case Smpp::CommandId::DeliverSm:
+					{
+						// Delivery Report
+						// Received SMS
+						Smpp::DeliverSm pdu((Smpp::Uint8 *)tmpNetBuf.GetBuffer());
+						Smpp::Uint8 esm = pdu.esm_class();
+						if(esm&0x04){
+							// Delivery Receipt
+							std::cout << "This is a Delivery Receipt" << std::endl;
+						}else{
+							// Return DeliverySmResp
+							std::cout << "One SMS Received" << std::endl;
+							Smpp::DeliverSmResp pduRsp;
+							Smpp::String destAddr = pdu.destination_addr().address() ;
+							Smpp::String srcAddr = pdu.source_addr().address() ;
+							NetBuffer tempBuffer;
+							char msgId[65] = {0x00};
+							sprintf(msgId, "%s-%s-%ld", destAddr.c_str(), srcAddr.c_str(), time(NULL));
+							pduRsp.message_id(msgId);
+							pduRsp.command_status(0);
+							pduRsp.sequence_number(pdu.sequence_number());
+							// write to nw
+							tempBuffer.Append(pduRsp.encode(), pduRsp.command_length());
+							objAddr->Write(tempBuffer);
+						}
+					}
+					break;
+				case Smpp::CommandId::DeliverSmResp:
+					{
+						// Should not Receive
 					}
 					break;
 				default:
@@ -447,8 +510,8 @@ void *Esme::ThSmsReader(void *arg){
 		tempBuffer.Erase();
 		if(objAddr->Read(tempBuffer) > 0){
 			objAddr->receiveQueue.push(tempBuffer);
-			tempBuffer.PrintHexDump();
-			std::cout << std::endl;
+			//tempBuffer.PrintHexDump();
+			//APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "%.*s", tempBuffer.GetLength(), tempBuffer.GetBuffer());
 		}else{
 			usleep(DFL_USLEEP_VALUE);
 		}

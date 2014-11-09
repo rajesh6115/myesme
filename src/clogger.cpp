@@ -5,6 +5,9 @@
 ******************************************************************************/
 
 #include "clogger.hpp"
+// removed from .h file as it is not exposed to usr
+int logger_open(logger_p log); 
+int logger_close(logger_p log);
 
 logger_p logger_init(void)
 {
@@ -83,6 +86,7 @@ int logger_apptag(logger_p log, const char *apptag){
 	if(log){
 		memset(log->tag, 0x00, sizeof(log->tag)); // clear tag buffer
 		strcpy(log->tag, apptag);
+		return 0;
 	}else{
 		return -1;
 	}
@@ -92,6 +96,7 @@ int logger_filepath(logger_p log, const char *filepath){
 	if(log){
 		memset(log->path, 0x00, sizeof(log->path)); // clear tag buffer
 		strcpy(log->path, filepath);
+		return 0;
 	}else{
 		return -1;
 	}
@@ -100,10 +105,30 @@ int logger_filename(logger_p log, const char *filename){
 	if(log){
 		memset(log->name, 0x00, sizeof(log->name)); // clear tag buffer
 		strcpy(log->name, filename);
+		return 0;
 	}else{
 		return -1;
 	}
 }
+
+int logger_level(logger_p log, unsigned int level){
+	if(log){
+		log->level = level;
+		return 0;
+	}else{
+		return -1;
+	}
+}
+
+int logger_interval(logger_p log, unsigned int interval){
+	if(log){
+		log->interval = interval;
+		return 0;
+	}else{
+		return -1;
+	}
+}
+
 
 int logger_open(logger_p log)
 {
@@ -180,6 +205,9 @@ int logger_log_header(logger_p log, unsigned int log_level, const char *srcname,
 		return 0;
 	}
 	log->is_log = 1;
+	if(log->fp == NULL){
+		logger_open(log);  // If Logger is running for first time
+	}
 	/////check for new file generation condition///////////
 	temp_time = time(NULL);
 	if((temp_time - log->create_time) > log->interval)

@@ -68,12 +68,12 @@ int logger_cleanup(logger_p);
 int logger_apptag(logger_p, const char *apptag );
 int logger_filepath(logger_p, const char *filepath);
 int logger_filename(logger_p, const char *filename);
+int logger_level(logger_p, unsigned int level);
+int logger_interval(logger_p, unsigned int interval);
 #ifdef ENABLE_THREADS
 int logger_lock(logger_p);
 int logger_unlock(logger_p);
 #endif
-int logger_open(logger_p);
-int logger_close(logger_p);
 int logger_set(logger_p, unsigned int option, const char *);
 int logger_log_header(logger_p log, unsigned int log_level, const char *srcname, unsigned int line_no);
 int logger_log_message(logger_p ,const char *format ,...);
