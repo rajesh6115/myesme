@@ -350,7 +350,11 @@ void *Esme::ThOnReceivePdu(void *arg){
 						// Remove from Map As Sucessfully Response We Got
 						objAddr->UnRegisterPdu(tmpNetBuf);
 						// check status and change state
-						objAddr->state = ST_BIND;
+						if(resp.command_status() == 0){
+							objAddr->state = ST_BIND;
+						}else{
+							objAddr->state = ST_BIND_FAIL;
+						}
 					}
 					break;
 				case Smpp::CommandId::BindTransmitterResp:
@@ -362,7 +366,11 @@ void *Esme::ThOnReceivePdu(void *arg){
 						APP_LOGGER(CG_MyAppLogger, LOG_INFO, "SMSCID=%s", smscId.c_str());
 						objAddr->UnRegisterPdu(tmpNetBuf);
 						// check status and change state
-						objAddr->state = ST_BIND;
+						if(resp.command_status() == 0){
+							objAddr->state = ST_BIND;
+						}else{
+							objAddr->state = ST_BIND_FAIL;
+						}
 					}
 					break;
 				case Smpp::CommandId::BindTransceiverResp:
@@ -373,7 +381,11 @@ void *Esme::ThOnReceivePdu(void *arg){
 						APP_LOGGER(CG_MyAppLogger, LOG_INFO, "SMSCID=%s", smscId.c_str());
 						objAddr->UnRegisterPdu(tmpNetBuf);
 						// check status and change state
-						objAddr->state = ST_BIND;
+						if(resp.command_status() == 0){
+							objAddr->state = ST_BIND;
+						}else{
+							objAddr->state = ST_BIND_FAIL;
+						}
 					}
 					break;
 				case Smpp::CommandId::UnbindResp:
@@ -417,6 +429,8 @@ void *Esme::ThOnReceivePdu(void *arg){
 					{
 						std::cout << "Submit Sm Resp " << std::endl;
 						// UnRegister the pdu
+						objAddr->UnRegisterPdu(tmpNetBuf);
+						objAddr->DoDatabaseUpdate(tmpNetBuf); // for All Data Base Related Insert/Update
 					}
 					break;
 				case Smpp::CommandId::DataSm:
@@ -519,6 +533,101 @@ void *Esme::ThSmsReader(void *arg){
 	objAddr->rcvThStatus = TH_ST_STOP;
 	return NULL;
 }
-/*
-void *Esme::ThSmsWriter(void *arg){
-}*/
+
+int Esme::StartSender(void){
+	sendThStatus = TH_ST_REQ_RUN;
+        if(pthread_create(&sendThId, NULL, &(Esme::ThSmsSender),this)){
+                //fail to create thread
+                return -1;
+        }
+        return 0;
+}
+
+int Esme::StopSender(void){
+	sendThStatus = TH_ST_REQ_STOP;
+        while(sendThStatus == TH_ST_REQ_STOP){
+                // Waiting for send thread to stop
+                sleep(DFL_SLEEP_VALUE);
+        }
+        return 0;
+
+}
+
+thread_status_t Esme::GetSenderThStatus(void){
+	return sendThStatus;
+}
+
+void *Esme::ThSmsSender(void *arg){
+	sms_data_t tmpSms;
+	if(arg == NULL){
+                return NULL;
+        }
+        Esme *objAddr = (Esme *) arg;
+        std::cout << "Thread Started" << std::endl;
+        objAddr->sendThStatus = TH_ST_RUNNING;
+	while(objAddr->sendThStatus == TH_ST_RUNNING){
+		// Test Data Availability in Queue
+		//if(available)
+		if(!objAddr->sendQueue.empty()){
+		// form pdu and Send
+			tmpSms = objAddr->sendQueue.front();
+			objAddr->sendQueue.pop();
+			objAddr->SendSubmitSm(tmpSms.party_a, tmpSms.party_b, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
+		}else{
+		//else
+		// sleep for some second to give chance to other thread run
+		sleep(1); // currently only designed to thread functionality
+		}
+
+	}
+	objAddr->sendThStatus = TH_ST_STOP;
+	return NULL;
+}
+
+int Esme::SendSms(sms_data_t sms){
+	// Make thread safe pending
+	sendQueue.push( sms);
+	return 0;
+}
+
+int Esme::DoDatabaseUpdate(NetBuffer &tmpNetBuf){
+	std::string myUpdateQuery;
+	char tmpBuffer[256]={0x00};
+	Smpp::Uint32 commandId=0x00000000;
+	commandId = Smpp::get_command_id((Smpp::Uint8 *)tmpNetBuf.GetBuffer());
+	switch(commandId){
+		case Smpp::CommandId::SubmitSm:
+		{
+			memset(tmpBuffer, 0x00, sizeof(tmpBuffer));
+			sprintf(tmpBuffer, "UPDATE SMSMT SET iPduId=%u and iStatus=%u Where iSNo=%u" ,1 , SMS_ST_SUBMITTED, 1);
+		}
+		break;
+		case Smpp::CommandId::SubmitSmResp:
+		{
+			memset(tmpBuffer, 0x00, sizeof(tmpBuffer));
+			sprintf(tmpBuffer, "UPDATE SMSMT SET iPduId=%u and iStatus=%u Where iSNo=%u" ,1 , SMS_ST_ACKNOWLEDGED, 1);
+			
+		}
+		break;
+		case Smpp::CommandId::DeliverSm:
+		{
+			memset(tmpBuffer, 0x00, sizeof(tmpBuffer));
+			sprintf(tmpBuffer, "UPDATE SMSMT SET vcMsgId=%s and iStatus=%u Where iSNo=%u" ,"1" , SMS_ST_SUBMITTED, 1);
+
+		}
+		break;
+	//	case Smpp::CommandId::DeliverSmResp:
+	//	{
+	//		memset(tmpBuffer, 0x00, sizeof(tmpBuffer));
+	//
+	//	}
+	//	break;
+		default:
+		{
+			APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "DataBase Interaction Not Available For %08x ", commandId);
+		}
+		break;
+	}
+	// Execute Prepared Query
+	return 0;
+}

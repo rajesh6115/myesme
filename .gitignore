@@ -6,6 +6,8 @@
 # Libraries
 *.lib
 *.a
+*.lo
+*.la
 # Shared objects (inc. Windows DLLs)
 *.dll
 *.so
@@ -18,16 +20,24 @@
 *.i*86
 *.x86_64
 *.hex
+# My Project Binary Name
+myesme
 # Autotools 
 configure
 config.h.in
 config.h
+config.log
+config.status
+stamp-h1
+libtool
 m4
 aclocal.m4
 autom4te.cache
 build-aux
 Makefile
 Makefile.in
+.libs
+.deps
 # ctags files
 tags
 

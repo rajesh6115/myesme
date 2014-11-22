@@ -2,36 +2,15 @@
 #include "Esme.hpp"
 #include "Externs.hpp"
 #include "MySqlWrapper.hpp"
+#include "pthread.h"
+#include "Defines.hpp"
+extern thread_status_t G_CampaignThStatus;
+	Esme myEsme;
 
-uint32_t IsActiveCampaign(){
-	CMySQL sqlobj;
-	uint32_t campaignId;
-	int errNo;
-	char errMsg[256]={0x00};
-	if(sqlobj.mcfn_Open("127.0.0.1", "test", "root", "padmapur") ){
-		std::cout << "Connection Estalishe to Database" << std::endl;
-		
-	}else{
-		// Log Error
-		return 0;
-	}
-	std::string activeCampaignQuery = "SELECT iSNo FROM CampaignMaster WHERE iActive=1 and dtStartDatetime < NOW() LIMIT 1";
-	if(sqlobj.mcfn_GetResultSet(activeCampaignQuery.c_str(), errNo, errMsg)){
-		std::cout << "Query Executed" << std::endl;
-	}else{
-		std::cout << "Problem in Excuting Query" << activeCampaignQuery << std::endl;
-		return 0;
-	}
-	MYSQL_ROW tempRow;
-	tempRow = mysql_fetch_row(sqlobj.m_pRecordsetPtr);
-	std::cout << "result="<< tempRow[0] << std::endl;
-	campaignId = atoi(tempRow[0]);
-	mysql_free_result(sqlobj.m_pRecordsetPtr);
-	return campaignId;
-}
+
 
 int main(int argc, char *argv[]){
-	Esme myEsme;
+	pthread_t campaignThId;
 	uint32_t campaignId=0;
 	std::cout << "hello Esms" << std::endl;
 	// Open and Read Cofigurations
@@ -50,6 +29,10 @@ int main(int argc, char *argv[]){
 	if(campaignId = IsActiveCampaign()){
 		std::cout << "There is a Active Campaign with Campaign Id " << campaignId << std::endl;
 		// Start Campaign Thread
+		if(pthread_create(&campaignThId, NULL, CampaignThread, &campaignId)==0){
+			std::cout << "Starting Campaign with Campaign ID " << campaignId << std::endl;
+			sleep(5); // Give time To Start later change with thread status logic
+		}
 	}
 	// Open Esme Connection
 	std::cout << CG_MyAppConfig.GetSmscIp() << ":" << CG_MyAppConfig.GetSmscPort() << std::endl;
@@ -81,17 +64,24 @@ int main(int argc, char *argv[]){
 	while(myEsme.GetEsmeState() != Esme::ST_BIND){
 		sleep(1);
 	}
-	// Start Keep Alive Thread
-	myEsme.StartLinkCheck();
-	while(myEsme.GetEnquireLinkThStatus() != TH_ST_RUNNING){
-		sleep(1);
-	}
-	myEsme.SendSubmitSm("080008", "8884882772", 1, (Smpp::Uint8 *)"Wel Come to SMS Test", 20);
-	sleep(10);
-	myEsme.StopLinkCheck();
-	myEsme.UnBind();
-	while(myEsme.GetEsmeState() != Esme::ST_UNBIND){
-		sleep(1);
+	if(myEsme.GetEsmeState() != Esme::ST_BIND_FAIL){
+		// Start Keep Alive Thread
+		myEsme.StartLinkCheck();
+		while(myEsme.GetEnquireLinkThStatus() != TH_ST_RUNNING){
+			sleep(1);
+		}
+		//myEsme.SendSubmitSm("080008", "8553001122", 1, (Smpp::Uint8 *)"Wel Come to SMS Test", 20);
+		//sleep(10);
+		myEsme.StartSender();
+		while(myEsme.GetSenderThStatus() != TH_ST_RUNNING){
+			sleep(1);
+		}
+		myEsme.StopLinkCheck();
+		myEsme.UnBind();
+		while(myEsme.GetEsmeState() != Esme::ST_UNBIND){
+			sleep(1);
+		}
+
 	}
 	myEsme.StopReader();
 	myEsme.StopPduProcess();

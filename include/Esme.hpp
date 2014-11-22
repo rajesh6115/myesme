@@ -24,30 +24,6 @@
 #define BIND_WRONLY 2
 #define BIND_RDWR 3
 
-typedef enum sms_status{
-	IDLE=0,
-	PICKED=1,
-	SUBMITTED=2,
-	ACKNOWLEDGED=3,
-	DELIVERED=4,
-	FAIL=99,
-}sms_status_t;
-
-typedef struct smsdata{
-	uint32_t id;
-	uint32_t status;
-	uint8_t party_a[16];
-	uint8_t party_b[16];
-	uint8_t type;
-}sms_data_t;
-typedef enum thread_status{
-	TH_ST_IDLE=0,
-	TH_ST_REQ_RUN=1,
-	TH_ST_RUNNING=3,
-	TH_ST_REQ_STOP=4,
-	TH_ST_STOP=5,
-}thread_status_t;
-
 class Esme{
 	public: 
 		enum STATE{
@@ -74,9 +50,16 @@ class Esme{
 		std::map<uint32_t, NetBuffer> pduRegister;
 		int RegisterPdu(NetBuffer &tmpNetBuf);
 		int UnRegisterPdu(NetBuffer &tmpNetBuf);	
+		// Data Base Update/Insert	
+		int DoDatabaseUpdate(NetBuffer &tmpNetBuf);
 		//
 		std::queue<sms_data_t> sendQueue;
 		std::queue<NetBuffer> receiveQueue;
+		// Sending Thread
+		
+		static void *ThSmsSender(void *);
+		pthread_t sendThId;
+		thread_status_t sendThStatus;
 		// Receiving thread
 		pthread_t rcvThId;
 		thread_status_t rcvThStatus;
@@ -106,16 +89,19 @@ class Esme{
 		int Bind(Smpp::SystemId sysId, Smpp::Password pass, uint8_t bindType);
 		int SendSubmitSm(const Smpp::Char *srcAddr, const Smpp::Char *destAddr, uint8_t type, const Smpp::Uint8 *sms, Smpp::Uint32 length);
 		int UnBind(void);
-//		void *ThSmsWriter(void *);
+		int StartSender(void);
+		int StopSender(void);
 		int StartReader(void);
 		int StopReader(void);
 		int StartPduProcess(void);
 		int StopPduProcess(void);
 		int StartLinkCheck(void);
 		int StopLinkCheck(void);
+		thread_status_t GetSenderThStatus(void);
 		thread_status_t GetPduProcessThStatus(void);
 		thread_status_t GetRcvThStatus(void);
 		thread_status_t GetEnquireLinkThStatus(void);
+		int SendSms(sms_data_t sms);
 };
 #endif
 
