@@ -37,7 +37,7 @@ extern "C" {
 #define APP_LOGGER(OBJECT, LOG_LEVEL, LOGDATA, ...) {\
 	logger_lock(OBJECT);\
 	logger_log_header(OBJECT, LOG_LEVEL, __FILE__, __LINE__);\
-	logger_log_message(OBJECT, LOGDATA, __VA_ARGS__);\
+	logger_log_message(OBJECT, LOGDATA, ##__VA_ARGS__);\
 	logger_unlock(OBJECT);\
 	}
 

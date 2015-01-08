@@ -17,6 +17,7 @@
 	<smsc>
 		<ip>127.0.0.1</ip>
 		<port>2775</port>
+		<tps>100</tps>
 	</smsc>
 	<bind>
 		<system_id>smppclient1</system_id>

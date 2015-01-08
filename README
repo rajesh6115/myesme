@@ -1,0 +1,50 @@
+              FEATURES
+---------------------------------
+1. Can Bind as Tx, Rx or TRx
+2. Logging of message in files
+3. Configurable
+4. Modulised by Job Deviding in Threads
+5. Can UnBind at any Time Safely
+6. Multi Campaign
+7. Multi esme connection
+8. Esme Operation Status Report
+9. Use of SmsmtMulti for More Through put
+10. Integration of thrift to ondemand services realtime
+11. Auto Config From Configuration file
+12. Reload of Config in REAL-TIME ONDEMAND
+13. Conjection Management Logic For SubmitSm DeliverySm MaximumQueue in PDU 
+14. Persitense Management
+15. Esme Status Report Generation AND Alerts If Required
+
+
+            WORKING FEATURES
+---------------------------------------
+1. Sending SMS From Campaign
+2. Conjection Management
+3. High tps By Independent Sender 
+
+
+            TODOS
+---------------------------------------
+1. Better Congetion Management By Strong Resending Logic
+2. NOT USE Any #define variables move threm to enums or Configuration
+3. Query Forming Logic, Passing Logic to a Different Process For Better tps
+4. Complete MULTISM and MULTISMRESP
+5. Multi Campaign Logic Developement
+6. Removing all Print to console statement add Log inplace if required
+7. SMS Delivery Report Checking
+8. Make ESME Statefull
+9. Support Outbind
+10. Move All Starting Logic to Start and Stoping Logic To Stop Of Esme
+11. Use Counters/Timers to Close Connection Sucessfully
+12. Make Linkcheck Thread Rubust by Implemention Re-Connect to SMSC Logic
+13. Make RnD for DeliverySm Logic and DeliverySmResp
+14. Regorous test for working features
+
+
+HOW TO INSTALL
+-----------------------------------------------
+1. INSTALL REQUIRED PACKAGES (UBUNTU)
+	# sudo apt-get install g++ libtool autoconf automake libmysqlclient-dev exuberant-ctags
+2. FORTESTING 
+	# sudo apt-get install openjdk-7-jre

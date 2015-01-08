@@ -4,14 +4,21 @@
 #include "MySqlWrapper.hpp"
 #include "pthread.h"
 #include "Defines.hpp"
+#include <signal.h>
 extern thread_status_t G_CampaignThStatus;
-	Esme myEsme;
+Esme myEsme;
+int IS_PROCESS_RUN=0;
+
+void int_signal(int num){
+	IS_PROCESS_RUN = 0;
+}
 
 
 
 int main(int argc, char *argv[]){
 	pthread_t campaignThId;
 	uint32_t campaignId=0;
+	signal(SIGINT, int_signal);
 	std::cout << "hello Esms" << std::endl;
 	// Open and Read Cofigurations
 	CG_MyAppConfig.Load("/usr/local/etc/MyEsme.xml");
@@ -25,15 +32,6 @@ int main(int argc, char *argv[]){
 
 	APP_LOGGER(CG_MyAppLogger, LOG_DEFAULT, "Compiled On %s %s", __DATE__, __TIME__);
 	APP_LOGGER(CG_MyAppLogger, LOG_DEFAULT, "Report Bugs to %s",PACKAGE_BUGREPORT);
-	// Open Data bases
-	if(campaignId = IsActiveCampaign()){
-		std::cout << "There is a Active Campaign with Campaign Id " << campaignId << std::endl;
-		// Start Campaign Thread
-		if(pthread_create(&campaignThId, NULL, CampaignThread, &campaignId)==0){
-			std::cout << "Starting Campaign with Campaign ID " << campaignId << std::endl;
-			sleep(5); // Give time To Start later change with thread status logic
-		}
-	}
 	// Open Esme Connection
 	std::cout << CG_MyAppConfig.GetSmscIp() << ":" << CG_MyAppConfig.GetSmscPort() << std::endl;
 	if(myEsme.OpenConnection(CG_MyAppConfig.GetSmscIp(), CG_MyAppConfig.GetSmscPort()) == 0){
@@ -76,16 +74,31 @@ int main(int argc, char *argv[]){
 		while(myEsme.GetSenderThStatus() != TH_ST_RUNNING){
 			sleep(1);
 		}
+		// Open Data bases
+		if(campaignId = IsActiveCampaign()){
+			std::cout << "There is a Active Campaign with Campaign Id " << campaignId << std::endl;
+			// Start Campaign Thread
+			if(pthread_create(&campaignThId, NULL, CampaignThread, &campaignId)==0){
+				std::cout << "Starting Campaign with Campaign ID " << campaignId << std::endl;
+				sleep(5); // Give time To Start later change with thread status logic
+			}
+		}
+		IS_PROCESS_RUN = 1;
+		while(IS_PROCESS_RUN){
+			sleep(10);
+		}
+
 		myEsme.StopLinkCheck();
 		myEsme.UnBind();
 		while(myEsme.GetEsmeState() != Esme::ST_UNBIND){
+			APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "CURRENT STATE is %d ", myEsme.GetEsmeState());
 			sleep(1);
 		}
 
 	}
+	myEsme.CloseConnection(); // Closing forcefully
 	myEsme.StopReader();
 	myEsme.StopPduProcess();
-	myEsme.CloseConnection();
 	// Close Logger
 	logger_cleanup(CG_MyAppLogger);
 	return 0;

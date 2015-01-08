@@ -29,9 +29,11 @@ typedef struct smsdata{
 typedef enum thread_status{
         TH_ST_IDLE=0,
         TH_ST_REQ_RUN=1,
-        TH_ST_RUNNING=3,
-        TH_ST_REQ_STOP=4,
-        TH_ST_STOP=5,
+        TH_ST_RUNNING=2,
+	TH_ST_REQ_PAUSE=3,
+	TH_ST_PAUSED=4,
+        TH_ST_REQ_STOP=5,
+        TH_ST_STOP=6,
 }thread_status_t;
 // Global Function Declaration
 void * CampaignThread(void *arg);

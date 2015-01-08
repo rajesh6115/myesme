@@ -45,23 +45,23 @@ int EsmeConfig::Load(const char *cfgFile){
 	// MySql
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "mysql", "ip", value)==0){
-                //interval = atoi(value);
+		mysqlIp = value;
         }
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "mysql", "port", value)==0){
-         //       interval = atoi(value);
+                mysqlPort = atoi(value);
         }
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "mysql", "user", value)==0){
-                //interval = atoi(value);
+		mysqlUser = value;
         }
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "mysql", "password", value)==0){
-                //interval = atoi(value);
+		mysqlPass = value;
         }
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "mysql", "name", value)==0){
-                //interval = atoi(value);
+		mysqlDbName = value;
         }
 	// SMSC 
 	memset(value, 0x00, sizeof(value));
@@ -71,6 +71,14 @@ int EsmeConfig::Load(const char *cfgFile){
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "smsc", "port", value)==0){
                 port = atoi(value);
+        }
+	memset(value, 0x00, sizeof(value));
+	if(appconfig_getvalue(myconfig, "smsc", "tps", value)==0){
+		smsctps=0;
+                smsctps = atoi(value);
+		if(smsctps == 0){
+			smsctps = 100; // Some Default Value
+		}	
         }
 	// BIND
 	memset(value, 0x00, sizeof(value));
@@ -162,4 +170,24 @@ Smpp::Npi EsmeConfig::GetNpi(void){
 
 Smpp::AddressRange EsmeConfig::GetAddressRange(void){
 	return bindAddrRange;
+}
+
+std::string EsmeConfig::GetMysqlIp(void){
+	return mysqlIp;
+}
+
+uint32_t EsmeConfig::GetMysqlPort(void){
+	return mysqlPort;
+}
+
+std::string EsmeConfig::GetMysqlUser(void){
+	return mysqlUser;
+}
+
+std::string EsmeConfig::GetMysqlPassword(void){
+	return mysqlPass;
+}
+
+std::string EsmeConfig::GetMysqlDbName(void){
+	return mysqlDbName;
 }

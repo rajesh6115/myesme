@@ -231,7 +231,7 @@ int logger_log_header(logger_p log, unsigned int log_level, const char *srcname,
 	return ret_val;
 }
 
-int logger_log_message(logger_p log,const char *format ,...)
+int logger_log_message(logger_p log, const char *format, ...)
 {
 	int ret_val = 0;
 	va_list args;

@@ -14,6 +14,9 @@
 #include "NetBuffer.hpp"
 #include "smpp.hpp"
 #include "Externs.hpp"
+#ifdef _MYSQL_UPDATE_
+#include "MySqlWrapper.hpp"
+#endif
 
 #define DFL_USLEEP_VALUE 500000
 #define DFL_SLEEP_VALUE 3
@@ -36,16 +39,22 @@ class Esme{
 			ST_UNBIND_FAIL,
 		};
 	private:
+#ifdef _MYSQL_UPDATE_
+		CMySQL m_sqlobj;
+#endif
 		// smsc details 
 		std::string host;
 		int port;
+		unsigned int smsctps;
 		int smscSocket;
 		struct sockaddr_in smscInfo;
 		enum STATE state;
 		bool isLive;
 		// Data structures to maintain temp sms // avoid db interaction
-		std::map<int64_t, sms_data_t> sendSmsMap;
-		std::map<int64_t, sms_data_t> receiveSmsMap;
+		std::map<uint32_t, sms_data_t> sendSmsMap;
+		int RegisterSmsData(uint32_t ,sms_data_t);
+		int UnRegisterSmsData(uint32_t);
+		std::map<int32_t, sms_data_t> receiveSmsMap;
 		// Register for Pdu So that Retransmissiion can happen
 		std::map<uint32_t, NetBuffer> pduRegister;
 		int RegisterPdu(NetBuffer &tmpNetBuf);
@@ -87,7 +96,7 @@ class Esme{
 		int Write(NetBuffer &); // Just Write all Bytes
 		int Read(NetBuffer &); // Frammer will be implemented here 
 		int Bind(Smpp::SystemId sysId, Smpp::Password pass, uint8_t bindType);
-		int SendSubmitSm(const Smpp::Char *srcAddr, const Smpp::Char *destAddr, uint8_t type, const Smpp::Uint8 *sms, Smpp::Uint32 length);
+		int SendSubmitSm(uint32_t pduSeq, const Smpp::Char *srcAddr, const Smpp::Char *destAddr, uint8_t type, const Smpp::Uint8 *sms, Smpp::Uint32 length);
 		int UnBind(void);
 		int StartSender(void);
 		int StopSender(void);

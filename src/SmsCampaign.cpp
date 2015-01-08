@@ -7,11 +7,11 @@ thread_status_t G_CampaignThStatus=TH_ST_IDLE;
 
 uint32_t IsActiveCampaign(void){
         CMySQL sqlobj;
-        uint32_t campaignId;
+        uint32_t campaignId=0;
         int errNo;
         char errMsg[256]={0x00};
         char tempBuff[256]={0x00};
-        if(sqlobj.mcfn_Open("127.0.0.1", "test", "root", "padmapur") ){
+        if(sqlobj.mcfn_Open(CG_MyAppConfig.GetMysqlIp().c_str(), CG_MyAppConfig.GetMysqlDbName().c_str(), CG_MyAppConfig.GetMysqlUser().c_str(), CG_MyAppConfig.GetMysqlPassword().c_str()) ){
                 std::cout << "Connection Estalishe to Database" << std::endl;
 
         }else{
@@ -45,12 +45,19 @@ void * CampaignThread(void *arg){
 	char errMsg[256]={0x00};
 	char tempBuff[256]={0x00};
 	CMySQL sqlobj;
-	if(sqlobj.mcfn_Open("127.0.0.1", "test", "root", "padmapur") ){
+	if(myEsme.GetEsmeState() != Esme::ST_BIND){
+		// After Esme in BIND state allow Campaign thread
+		// Also Add conditiion for type of binding as it is not required for rx
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "Esme Not Binded But Campaign Starting....");
+		return NULL;
+	}
+	if(sqlobj.mcfn_Open(CG_MyAppConfig.GetMysqlIp().c_str(), CG_MyAppConfig.GetMysqlDbName().c_str(), CG_MyAppConfig.GetMysqlUser().c_str(), CG_MyAppConfig.GetMysqlPassword().c_str()) ){
 		std::cout << "Connection Estalishe to Database" << std::endl;
-
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Connected To Database");
 	}else{
 		G_CampaignThStatus = TH_ST_STOP ;
 		// Log Error
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "NOT ABLE TO CONNECT TO MYSQL");
 		return NULL;
 	}
 
@@ -59,9 +66,11 @@ void * CampaignThread(void *arg){
 	campaignDataQuery += tempBuff ;
 	if(sqlobj.mcfn_GetResultSet(campaignDataQuery.c_str(), errNo, errMsg)){
 		std::cout << "Query Executed" << std::endl;
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "QUERY: %s : SUCESS", campaignDataQuery.c_str());
 	}else{
 		std::cout << "Problem in Excuting Query" << campaignDataQuery << std::endl;
 		G_CampaignThStatus = TH_ST_STOP ;
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "QUERY: %s : FAIL", campaignDataQuery.c_str());
 		return NULL;
 	}
 	MYSQL_ROW tempRow;
@@ -82,6 +91,7 @@ void * CampaignThread(void *arg){
 	}else{
 		std::cout << "Problem in Excuting Query" << campaignStatusUpdateQuery << std::endl;
 		G_CampaignThStatus = TH_ST_STOP ;
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "QUERY: %s : FAIL", campaignStatusUpdateQuery.c_str());
 		return NULL;
 	}
 	// Start Push Processing Campaign
@@ -120,7 +130,7 @@ void * CampaignThread(void *arg){
 		sms_data_t tempSmsData;
 		tempRow = mysql_fetch_row(sqlobj.m_pRecordsetPtr);
 		while(tempRow){
-			std::cout << "RESULT: " << "iSNo"  <<tempRow[0] << ":" << std::endl;
+			//std::cout << "RESULT: " << "iSNo"  <<tempRow[0] << ":" << std::endl;
 			// Prepare sms data
 			memset(&tempSmsData, 0x00, sizeof(tempSmsData));
 			tempSmsData.id = atoi(tempRow[0]);
@@ -151,6 +161,7 @@ void * CampaignThread(void *arg){
 			// No Further Record
 			break;
 		}
+		sleep(1);//usleep(); // Window Sleep
 	}
 	// Once Done Campaign Update Campaign As Completed
 	//use same campaignUpdateQuery Variable

@@ -15,6 +15,13 @@ class EsmeConfig{
 	std::string tag;
 	uint32_t level;
 	uint32_t interval;
+	//Mysql
+	std::string mysqlIp;
+	uint32_t mysqlPort;
+	int smsctps;
+	std::string mysqlUser;
+	std::string mysqlPass;
+	std::string mysqlDbName;
 	// Connect
 	std::string ip;
 	uint32_t port;
@@ -49,6 +56,12 @@ class EsmeConfig{
         Smpp::Ton GetTon(void);
         Smpp::Npi GetNpi(void);
         Smpp::AddressRange GetAddressRange(void);
+	// Mysql
+	std::string GetMysqlIp(void);
+	uint32_t GetMysqlPort(void);
+	std::string GetMysqlUser(void);
+	std::string GetMysqlPassword(void);
+	std::string GetMysqlDbName(void);
 };
 #endif
 
