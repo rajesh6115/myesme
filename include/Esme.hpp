@@ -5,6 +5,8 @@
 #include <map>
 #include <queue>
 #include <pthread.h>
+// all defines will be in one File
+#include <Defines.hpp>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -18,15 +20,6 @@
 #include "MySqlWrapper.hpp"
 #endif
 
-#define DFL_USLEEP_VALUE 500000
-#define DFL_SLEEP_VALUE 3
-#define DFL_SMPP_URL "127.0.0.1"
-#define DFL_SMPP_PORT 2775
-
-#define BIND_RDONLY 1
-#define BIND_WRONLY 2
-#define BIND_RDWR 3
-
 class Esme{
 	public: 
 		enum STATE{
@@ -38,6 +31,11 @@ class Esme{
 			ST_UNBIND,
 			ST_UNBIND_FAIL,
 		};
+		typedef enum bind_type{
+			BIND_RDONLY=1,
+			BIND_WRONLY=2,
+			BIND_RDWR=3,
+		}bind_type_t;
 	private:
 #ifdef _MYSQL_UPDATE_
 		CMySQL m_sqlobj;
@@ -45,6 +43,7 @@ class Esme{
 		// smsc details 
 		std::string host;
 		int port;
+		bind_type_t smscType;
 		unsigned int smsctps;
 		int smscSocket;
 		struct sockaddr_in smscInfo;
@@ -111,6 +110,8 @@ class Esme{
 		thread_status_t GetRcvThStatus(void);
 		thread_status_t GetEnquireLinkThStatus(void);
 		int SendSms(sms_data_t sms);
+		int Start(void);
+		int Stop(void);
 };
 #endif
 

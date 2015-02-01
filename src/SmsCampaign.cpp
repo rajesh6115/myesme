@@ -18,10 +18,10 @@ uint32_t IsActiveCampaign(void){
                 // Log Error
                 return 0;
         }
-        std::string activeCampaignQuery = "SELECT iSNo FROM CampaignMaster WHERE iActive=";
+        std::string activeCampaignQuery = "SELECT iSNo FROM CampaignMaster WHERE iActive= 1 AND iStatus=";
         sprintf(tempBuff, "%d", CAMPAIGN_ST_SCHEDULED);
         activeCampaignQuery += tempBuff;
-        activeCampaignQuery += " and dtScheduleDatetime < NOW() LIMIT 1";
+        activeCampaignQuery += " AND dtScheduleDatetime < NOW() LIMIT 1";
         if(sqlobj.mcfn_GetResultSet(activeCampaignQuery.c_str(), errNo, errMsg)){
                 std::cout << "Query Executed" << activeCampaignQuery <<std::endl;
         }else{
@@ -130,15 +130,22 @@ void * CampaignThread(void *arg){
 		sms_data_t tempSmsData;
 		tempRow = mysql_fetch_row(sqlobj.m_pRecordsetPtr);
 		while(tempRow){
-			//std::cout << "RESULT: " << "iSNo"  <<tempRow[0] << ":" << std::endl;
 			// Prepare sms data
 			memset(&tempSmsData, 0x00, sizeof(tempSmsData));
 			tempSmsData.id = atoi(tempRow[0]);
 			tempSmsData.status= SMS_ST_PICKED;
-			strncpy((char *)tempSmsData.party_a, tempRow[1], 15);
-			strncpy((char *)tempSmsData.party_b, tempRow[2], 15);
-			strncpy((char *)tempSmsData.msg, tempRow[3], 511);
-			tempSmsData.type = atoi(tempRow[4]);
+			if(tempRow[1]){
+				strncpy((char *)tempSmsData.party_a, tempRow[1], 15);
+			}
+			if(tempRow[2]){
+				strncpy((char *)tempSmsData.party_b, tempRow[2], 15);
+			}
+			if(tempRow[3]){
+				strncpy((char *)tempSmsData.msg, tempRow[3], 511);
+			}
+			if(tempRow[4]){
+				tempSmsData.type = atoi(tempRow[4]);
+			}
 			myEsme.SendSms(tempSmsData);
 			// Update Query Nos
 			submittedMsisdn += tempRow[0];

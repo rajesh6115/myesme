@@ -109,6 +109,7 @@ int Esme::Write(NetBuffer &robj){
 	writtenBytes = write(this->smscSocket, robj.GetBuffer(), robj.GetLength());
 	if(writtenBytes == -1){
 		// Log Error
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN Writing To SMSC PLEASE RECONNECT" );
 		return -1;
 	}
 	return writtenBytes;
@@ -124,7 +125,7 @@ int Esme::Read(NetBuffer &robj){
 		requireBytes = Smpp::get_command_length(readBuffer);
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Require Bytes= 0x%08X PDU ID = 0x%08X ", requireBytes, Smpp::get_command_id((Smpp::Uint8 *) readBuffer));
 	}else{
-		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "first read required minimum 4 Bytes But %d Byte Received", readBytes);
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "READ ERROR MIN 4 Bytes But %d Byte Received", readBytes);
 	}
 	while(requireBytes>0){
 		if(readBytes == -1){
@@ -508,6 +509,9 @@ void *Esme::ThOnReceivePdu(void *arg){
 							tempBuffer.Append(pduRsp.encode(), pduRsp.command_length());
 							objAddr->Write(tempBuffer);
 							std::cout << "This is a Delivery Receipt" << std::endl;
+							// Update Database Here For Delivery Report
+							objAddr->DoDatabaseUpdate(tmpNetBuf); // for All Data Base Related Insert/Update
+							
 						}else{
 							// Return DeliverySmResp
 							std::cout << "One SMS Received" << std::endl;
@@ -604,6 +608,8 @@ void *Esme::ThSmsReader(void *arg){
 	}
 	APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "SMS READER EXITING");
 	objAddr->rcvThStatus = TH_ST_STOP;
+	// TODO 
+	// change state of ESME so that All Will Exit no reader means some problem happen to socket connection
 	return NULL;
 }
 
@@ -714,7 +720,7 @@ int Esme::DoDatabaseUpdate(NetBuffer &tmpNetBuf){
 				Smpp::SubmitSmResp pdu((Smpp::Uint8 *)tmpNetBuf.GetBuffer());
 				msgId = pdu.message_id() ;
 				memset(tmpBuffer, 0x00, sizeof(tmpBuffer));
-				sprintf(tmpBuffer, "UPDATE SMSMT SET vcMsgId='%s',iStatus=%u Where iSNo=%u AND iPduId=%u" , msgId.c_str(), SMS_ST_ACKNOWLEDGED, tmpSms.id, sequenceNumber);
+				sprintf(tmpBuffer, "UPDATE SMSMT SET vcMsgId='%s',iStatus=%u,dtSubmitDatetime=NOW() Where iSNo=%u AND iPduId=%u" , msgId.c_str(), SMS_ST_ACKNOWLEDGED, tmpSms.id, sequenceNumber);
 			}else{
 				// Log Error
 				std::cerr << "Error in Finding iSNo of a PDU "<< sequenceNumber <<std::endl;
@@ -723,8 +729,19 @@ int Esme::DoDatabaseUpdate(NetBuffer &tmpNetBuf){
 		break;
 		case Smpp::CommandId::DeliverSm:
 		{
+			//TODO find msgId from pdu
+			Smpp::DeliverSm pdu((Smpp::Uint8 *)tmpNetBuf.GetBuffer());
+			const Smpp::Tlv *p_msgidTlv = NULL;
+			p_msgidTlv = pdu.find_tlv(Smpp::Tlv::receipted_message_id);
+			if(p_msgidTlv){
+			char l_msgId[64]={0x00};
 			memset(tmpBuffer, 0x00, sizeof(tmpBuffer));
-			sprintf(tmpBuffer, "UPDATE SMSMT SET vcMsgId='%s',iStatus=%u Where iSNo=%u" ,"1" , SMS_ST_SUBMITTED, 1);
+			strncpy(l_msgId, (const char *)p_msgidTlv->value(), p_msgidTlv->length());
+			sprintf(tmpBuffer, "UPDATE SMSMT SET iStatus=%u,dtDeliveryDatetime=NOW() Where vcMsgId='%s'" , SMS_ST_DELIVERED, l_msgId); // replace 1 with exact msdId Found
+			}else{
+				// TODO log Error
+				APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "Delivery Report not having MsgId PDUID=%d", sequenceNumber);
+			}
 		}
 		break;
 	//	case Smpp::CommandId::DeliverSmResp:
@@ -764,4 +781,78 @@ int Esme::RegisterSmsData(uint32_t pduSeq, sms_data_t tmpSms){
 
 int Esme::UnRegisterSmsData(uint32_t pduSeq){
 	sendSmsMap.erase(pduSeq);
+}
+
+/**
+* To Start all necessary steps to start properly esme
+*/
+int Esme::Start(void){
+	//1. Open Connection
+	if(OpenConnection(CG_MyAppConfig.GetSmscIp(), CG_MyAppConfig.GetSmscPort()) != 0){
+		std::cerr << "socket Connection fail" << std::endl;
+		return -1;
+	}
+	//2. Start Reader As SMSC Response We Have to Read
+	StartReader();
+	//3. Wait Till Readed Thread Start Properly
+	while(GetRcvThStatus() != TH_ST_RUNNING){
+		sleep(1);
+	}
+	//4. Start Pdu Process Thread to Process main core engine
+	StartPduProcess();
+	//5. Wait tille Pdu Process Thread start Properly
+	while(GetPduProcessThStatus() != TH_ST_RUNNING){
+		sleep(1);
+	}
+	//6. Bind The Esme
+	Smpp::SystemId sysId=CG_MyAppConfig.GetSystemId();
+	Smpp::Password pass=CG_MyAppConfig.GetPassword();
+	unsigned int type = CG_MyAppConfig.GetSmscType();
+	Bind( sysId, pass, type);
+	//7. Wait Till Bind Happen
+	while(GetEsmeState() != Esme::ST_BIND){
+		sleep(1);
+	}
+	//8. Check SMSC Bind Status
+	if(GetEsmeState() == Esme::ST_BIND_FAIL){
+		CloseConnection();
+		return -1;
+	}
+	//9. Start Link check Thread/ Live thread 
+	StartLinkCheck();
+	//10. Wait till Live Thread Start
+	while(GetEnquireLinkThStatus() != TH_ST_RUNNING){
+		sleep(1);
+	}
+	//11. Start Sender Thread if Tx is Type For esme
+	if((CG_MyAppConfig.GetSmscType() == Esme::BIND_WRONLY) || (CG_MyAppConfig.GetSmscType()==Esme::BIND_RDWR)){
+		StartSender(); //StartSender
+		while(GetSenderThStatus() != TH_ST_RUNNING){
+			sleep(1);
+		}
+	}
+	return 0;
+}
+
+int Esme::Stop(void){
+	//1. Stop Link / Live Thread
+	StopLinkCheck();
+	//2. If Sender Running Then Stop Sender
+	if(GetSenderThStatus() == TH_ST_RUNNING){
+		StopSender();
+	}	
+	//3. Unbind From SMSC
+	UnBind();
+	//4. Wait Till Unbind Happen Properly
+	while(GetEsmeState() != Esme::ST_UNBIND){
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "CURRENT STATE is %d ", GetEsmeState());
+		sleep(1);
+	}
+	//5. Close Socket Connection So That We can Safely Close Application
+	CloseConnection();
+	//6. Stop Reader Thread
+	StopReader();
+	//7. Stop Pdu Processing
+	StopPduProcess();
+	return 0;
 }

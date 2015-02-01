@@ -12,17 +12,18 @@
 		<port>3306</port>
 		<user>root</user>
 		<password>padmapur</password>
-		<name>testdatabase</name>
+		<name>smstest</name>
 	</mysql>
 	<smsc>
 		<ip>127.0.0.1</ip>
 		<port>2775</port>
 		<tps>100</tps>
+		<type>Rx</type>
 	</smsc>
 	<bind>
 		<system_id>smppclient1</system_id>
 		<password>password</password>
-		<system_type>EMS</system_type>
+		<system_type>VMA</system_type>
 		<interface_version>5.0</interface_version>
 		<ton>0</ton>
 		<npi>0</npi>

@@ -80,6 +80,18 @@ int EsmeConfig::Load(const char *cfgFile){
 			smsctps = 100; // Some Default Value
 		}	
         }
+	memset(value, 0x00, sizeof(value));
+	if(appconfig_getvalue(myconfig, "smsc", "type", value)==0){
+		if(strcmp(value, "Tx") == 0){
+			smscType = 2;
+		}else if(strcmp(value, "Rx") == 0){
+                        smscType = 1;
+                }else if(strcmp(value, "TRx") == 0){
+                        smscType = 3;
+                }else{
+			smscType = 1; // Default is Receiving
+		}
+	}
 	// BIND
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "system_id", value)==0){
@@ -190,4 +202,8 @@ std::string EsmeConfig::GetMysqlPassword(void){
 
 std::string EsmeConfig::GetMysqlDbName(void){
 	return mysqlDbName;
+}
+
+unsigned int EsmeConfig::GetSmscType(void){
+	return smscType;
 }

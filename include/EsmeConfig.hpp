@@ -18,7 +18,8 @@ class EsmeConfig{
 	//Mysql
 	std::string mysqlIp;
 	uint32_t mysqlPort;
-	int smsctps;
+	unsigned int smsctps;
+	unsigned int smscType;
 	std::string mysqlUser;
 	std::string mysqlPass;
 	std::string mysqlDbName;
@@ -48,7 +49,7 @@ class EsmeConfig{
 	// SMSC
 	std::string& GetSmscIp(void);
 	uint32_t GetSmscPort(void);
-
+	unsigned int GetSmscType(void);
         Smpp::SystemId GetSystemId(void);
         Smpp::Password GetPassword(void);
         Smpp::SystemType GetSystemType(void);

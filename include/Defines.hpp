@@ -4,5 +4,14 @@
 #define CAMPAIGN_ST_PICKED 2
 #define CAMPAIGN_ST_COMPLETED 10
 #define SMS_CAMPAIGN_WINDOW_SIZE 100
+#define DFL_USLEEP_VALUE 500000
+#define DFL_SLEEP_VALUE 3
+#define DFL_SMPP_URL "127.0.0.1"
+#define DFL_SMPP_PORT 2775
+/*
+#define BIND_RDONLY 1
+#define BIND_WRONLY 2
+#define BIND_RDWR 3
+*/
 
 #endif

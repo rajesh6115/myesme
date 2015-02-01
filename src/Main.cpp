@@ -13,15 +13,19 @@ void int_signal(int num){
 	IS_PROCESS_RUN = 0;
 }
 
-
-
 int main(int argc, char *argv[]){
+	char configfile[256]={0x00};
 	pthread_t campaignThId;
 	uint32_t campaignId=0;
 	signal(SIGINT, int_signal);
-	std::cout << "hello Esms" << std::endl;
+	if(argc != 2){
+		fprintf(stderr, "USAGE: %s <configfile>\n", argv[0]);
+		return 1;
+	}else{
+		sprintf(configfile, "%s", argv[1]);
+	}
 	// Open and Read Cofigurations
-	CG_MyAppConfig.Load("/usr/local/etc/MyEsme.xml");
+	CG_MyAppConfig.Load(configfile);
 	// Open Logger
 	CG_MyAppLogger = logger_init();
 	logger_filepath(CG_MyAppLogger, CG_MyAppConfig.GetLogPath().c_str());
@@ -34,71 +38,28 @@ int main(int argc, char *argv[]){
 	APP_LOGGER(CG_MyAppLogger, LOG_DEFAULT, "Report Bugs to %s",PACKAGE_BUGREPORT);
 	// Open Esme Connection
 	std::cout << CG_MyAppConfig.GetSmscIp() << ":" << CG_MyAppConfig.GetSmscPort() << std::endl;
-	if(myEsme.OpenConnection(CG_MyAppConfig.GetSmscIp(), CG_MyAppConfig.GetSmscPort()) == 0){
-		std::cout << "socket connected" << std::endl;
-	}else{
-		std::cerr << "socket Connection fail" << std::endl;
-		return -1;
-	}
-	getchar();
-	// Start Reading Thread
-	myEsme.StartReader();
-	while(myEsme.GetRcvThStatus() != TH_ST_RUNNING){
-		sleep(1);
-	}
-	
-	// Start Pdu Processing Thread
-	myEsme.StartPduProcess();
-	while(myEsme.GetPduProcessThStatus() != TH_ST_RUNNING){
-		sleep(1);
-	}
-	
-
-	// Start pushing Pdus
-	Smpp::SystemId sysId=CG_MyAppConfig.GetSystemId();
-	Smpp::Password pass=CG_MyAppConfig.GetPassword();
-	myEsme.Bind( sysId, pass, BIND_RDWR);
-	//myEsme.Bind( sysId, pass, BIND_WRONLY);
-	while(myEsme.GetEsmeState() != Esme::ST_BIND){
-		sleep(1);
-	}
-	if(myEsme.GetEsmeState() != Esme::ST_BIND_FAIL){
-		// Start Keep Alive Thread
-		myEsme.StartLinkCheck();
-		while(myEsme.GetEnquireLinkThStatus() != TH_ST_RUNNING){
-			sleep(1);
-		}
-		//myEsme.SendSubmitSm("080008", "8553001122", 1, (Smpp::Uint8 *)"Wel Come to SMS Test", 20);
-		//sleep(10);
-		myEsme.StartSender();
-		while(myEsme.GetSenderThStatus() != TH_ST_RUNNING){
-			sleep(1);
-		}
-		// Open Data bases
-		if(campaignId = IsActiveCampaign()){
-			std::cout << "There is a Active Campaign with Campaign Id " << campaignId << std::endl;
-			// Start Campaign Thread
-			if(pthread_create(&campaignThId, NULL, CampaignThread, &campaignId)==0){
-				std::cout << "Starting Campaign with Campaign ID " << campaignId << std::endl;
-				sleep(5); // Give time To Start later change with thread status logic
+	myEsme.Start();
+	// Start Main Loop Of Application
+	IS_PROCESS_RUN = 1;
+	while(IS_PROCESS_RUN){
+		// Check Type Of Connection 
+		// If Tx or RDWR Then Only Start Campaign Other Wise Just Wait For Other Thread Finish There Job
+//		printf("SMSC TYPE= %u \n", CG_MyAppConfig.GetSmscType());
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "SMSC TYPE= %u ", CG_MyAppConfig.GetSmscType());
+		if((CG_MyAppConfig.GetSmscType() == Esme::BIND_WRONLY) || (CG_MyAppConfig.GetSmscType()==Esme::BIND_RDWR)){
+			if(campaignId = IsActiveCampaign()){
+				std::cout << "There is a Active Campaign with Campaign Id " << campaignId << std::endl;
+				if(pthread_create(&campaignThId, NULL, CampaignThread, &campaignId)==0){
+//					std::cout << "Starting Campaign with Campaign ID " << campaignId << std::endl;
+					APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Starting Campaign with Campaign ID %u ", campaignId);
+					sleep(5); // Give time To Start later change with thread status logic
+				}
 			}
 		}
-		IS_PROCESS_RUN = 1;
-		while(IS_PROCESS_RUN){
-			sleep(10);
-		}
-
-		myEsme.StopLinkCheck();
-		myEsme.UnBind();
-		while(myEsme.GetEsmeState() != Esme::ST_UNBIND){
-			APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "CURRENT STATE is %d ", myEsme.GetEsmeState());
-			sleep(1);
-		}
-
+		sleep(DFL_SLEEP_VALUE);
 	}
-	myEsme.CloseConnection(); // Closing forcefully
-	myEsme.StopReader();
-	myEsme.StopPduProcess();
+
+	myEsme.Stop();
 	// Close Logger
 	logger_cleanup(CG_MyAppLogger);
 	return 0;

@@ -23,6 +23,9 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 # AR required to create static library
 AM_PROG_AR
+# Check of library created using ranlib
+AC_PROG_RANLIB
+AC_ENABLE_SHARED
 # libtool Required  
 LT_PREREQ([2.2])
 LT_INIT([dlopen])

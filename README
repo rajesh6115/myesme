@@ -48,3 +48,10 @@ HOW TO INSTALL
 	# sudo apt-get install g++ libtool autoconf automake libmysqlclient-dev exuberant-ctags
 2. FORTESTING 
 	# sudo apt-get install openjdk-7-jre
+3. Generate Configure
+	# autoreconf -i
+	# ./configure --prefix=/usr
+4. Make Project
+	# make
+5. Install Project
+	# make install or sudo make install

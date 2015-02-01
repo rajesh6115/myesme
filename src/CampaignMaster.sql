@@ -3,6 +3,7 @@ CREATE TABLE `CampaignMaster` (
   `vcCampaignName` varchar(64) NOT NULL,
   `vcCampaignFile` varchar(256) NOT NULL,
   `dtCreatedDatetime` datetime NOT NULL,
+  `dtScheduleDatetime` datetime NOT NULL,
   `dtStartDatetime` datetime DEFAULT NULL,
   `dtCompleteDatetime` datetime DEFAULT NULL,
   `vcTableName` varchar(128) DEFAULT NULL,
