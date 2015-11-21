@@ -5,25 +5,11 @@
 #include <cstdint>
 #include "appconfig.hpp"
 #include "smpp.hpp"
+#include "Externs.hpp"
 
 class EsmeConfig{
 	private:
 	appconfig_p myconfig;
-	// Logger
-	std::string path;
-	std::string name;
-	std::string tag;
-	uint32_t level;
-	uint32_t interval;
-	//Mysql
-	std::string mysqlIp;
-	uint32_t mysqlPort;
-	unsigned int smsctps;
-	unsigned int smscType;
-	std::string campaignType;
-	std::string mysqlUser;
-	std::string mysqlPass;
-	std::string mysqlDbName;
 	// Connect
 	std::string ip;
 	uint32_t port;
@@ -35,23 +21,25 @@ class EsmeConfig{
         Smpp::Ton bindTon;
         Smpp::Npi bindNpi;
         Smpp::AddressRange bindAddrRange;
+	uint32_t smsctps;
+	bind_type_t smscType;
         int Open(const char *cfgFile );
         int Close(void);
+#ifdef _MESSAGE_QUEUE_UPDATE_	
+	// Message Queue
+        std::string updateQueryQueueName;
+        uint32_t updateQueryQueueMsgSize;
+        uint32_t updateQueryQueueNoOfMsg;
+#endif
 
         public:
         EsmeConfig(const char *cfgFile=NULL);
         ~EsmeConfig(void);
         int Load(const char *cfgFile );
-	std::string& GetLogPath(void);
-	std::string& GetLogName(void);
-	std::string& GetLogTag(void);
-	uint32_t GetLogLevel(void);
-	uint32_t GetLogInterval(void);
 	// SMSC
-	std::string GetCampaignType(void);
 	std::string& GetSmscIp(void);
 	uint32_t GetSmscPort(void);
-	unsigned int GetSmscType(void);
+	bind_type_t GetSmscType(void);
         Smpp::SystemId GetSystemId(void);
         Smpp::Password GetPassword(void);
         Smpp::SystemType GetSystemType(void);
@@ -59,12 +47,13 @@ class EsmeConfig{
         Smpp::Ton GetTon(void);
         Smpp::Npi GetNpi(void);
         Smpp::AddressRange GetAddressRange(void);
-	// Mysql
-	std::string GetMysqlIp(void);
-	uint32_t GetMysqlPort(void);
-	std::string GetMysqlUser(void);
-	std::string GetMysqlPassword(void);
-	std::string GetMysqlDbName(void);
+	uint32_t GetSmscTps(void);
+#ifdef _MESSAGE_QUEUE_UPDATE_
+	// Message Queue
+        std::string GetUpdateQueryQueueName(void);
+        uint32_t GetUpdateQueryQueueMsgSize(void);
+        uint32_t GetUpdateQueryQueueNoOfMsg(void);
+#endif
 };
 #endif
 

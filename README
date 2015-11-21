@@ -28,25 +28,32 @@
 ---------------------------------------
 1. Better Congetion Management By Strong Resending Logic
 2. NOT USE Any #define variables move threm to enums or Configuration
-3. Query Forming Logic, Passing Logic to a Different Process For Better tps
 4. Complete MULTISM and MULTISMRESP
-5. Multi Campaign Logic Developement
 6. Removing all Print to console statement add Log inplace if required
 7. SMS Delivery Report Checking
 8. Make ESME Statefull
 9. Support Outbind
-10. Move All Starting Logic to Start and Stoping Logic To Stop Of Esme
 11. Use Counters/Timers to Close Connection Sucessfully
-12. Make Linkcheck Thread Rubust by Implemention Re-Connect to SMSC Logic
-13. Make RnD for DeliverySm Logic and DeliverySmResp
-14. Regorous test for working features
+--
+1. Protect Dequeue of Pdus From RecivePDU Queue, As Now On wards going to be used by threads of threadpool
+2. remove direct data base interaction, change logic of campaigns
+        Possible Solutions Can Be --
+                a. Separate Application Which will Throw From Data Base (Problem Of Queue Size may occur)
+3. remove updating data base up on intermediate stages like submitsm, submitsmresp
+        submitsmresp contains msgid which is important parameter for getting status of sms, So may some logic has to develope when avoiding submitsmresp data base interaction
+4. std::map is not persistence, So we need a persistence map for storing intermediate states of sms
+        a. shared memory
+        b. mysql/sqlite MEMORY ENGINE
+        c. memcache 
+        d. redis
+5. separating libs from main project like libsmpp and utils
+6. USE OF HEXDUMP FOR LOGGING 
+
 
           HIGH PRIORITY
 -----------------------------------------------------------
-1. Implement hexdump in logger
-2. Reconnect Logic
-3. Unicode Support
-4. Flash Message Support
+1. Protect Dequeue of Pdus From RecivePDU Queue, As Now On wards going to be used by threads of threadpool
+2. std::map is not persistence, So we need a persistence map for storing intermediate states of sms
 
 HOW TO INSTALL
 -----------------------------------------------
