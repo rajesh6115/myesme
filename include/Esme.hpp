@@ -12,12 +12,17 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <iconv.h>
 
 #include "NetBuffer.hpp"
 #include "smpp.hpp"
 #include "Externs.hpp"
 #ifdef _MYSQL_UPDATE_
 #include "MySqlWrapper.hpp"
+#endif
+
+#ifdef _MSG_QUE_MSGID_MAP_
+#include <MessageQueue.hpp>
 #endif
 
 class Esme{
@@ -30,6 +35,7 @@ class Esme{
 			ST_BIND_FAIL,
 			ST_UNBIND,
 			ST_UNBIND_FAIL,
+			ST_ERROR,
 		};
 		typedef enum bind_type{
 			BIND_RDONLY=1,
@@ -39,6 +45,20 @@ class Esme{
 	private:
 #ifdef _MYSQL_UPDATE_
 		CMySQL m_sqlobj;
+#endif
+
+#ifdef _MSG_QUE_MSGID_MAP_
+		SysMessageQueue m_msgIdQueue;
+		int WriteToMsgIdPersistenceQue(std::string vcMsgId, uint32_t iSNo);
+		std::map<std::string, std::string> m_msgIdMap;
+		int ReadFromMsgIdPersistenceQue(void);
+		std::string m_msgIdQueueName;
+		uint32_t m_noOfMsgsInMsgIdQueue;
+		uint32_t m_sizePerMsgInMsgIdQueue;
+#endif
+
+#ifdef _UPDATE_QUERY_QUE_
+		SysMessageQueue m_updateQueue;
 #endif
 		// smsc details 
 		std::string host;
@@ -84,12 +104,18 @@ class Esme{
 		// Sequence Number
 		static Smpp::Uint32 esmePduSequenceNum;
 	public:
+#ifdef _MSG_QUE_MSGID_MAP_
+		Esme(std::string host, uint32_t port, std::string vcMsgIdQueueName , uint32_t no_of_msg, uint32_t size_per_msg);
+#endif
 		~Esme(void);
 		Esme(std::string host=DFL_SMPP_URL, uint32_t port=DFL_SMPP_PORT);
 		Esme(const Esme&);
 		Esme &operator=(const Esme&);
 		Smpp::Uint32 GetNewSequenceNumber(void);
-		int OpenConnection(std::string host=DFL_SMPP_URL, uint32_t port=DFL_SMPP_PORT);
+		int OpenConnection(std::string host=DFL_SMPP_URL, uint32_t portno=DFL_SMPP_PORT);
+#ifdef _MSG_QUE_MSGID_MAP_
+		int OpenConnection(std::string host, uint32_t portno, std::string msgIdqueName, uint32_t size, uint32_t msg_count);
+#endif
 		int CloseConnection(void);
 		enum STATE GetEsmeState(void);
 		int Write(NetBuffer &); // Just Write all Bytes

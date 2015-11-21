@@ -20,6 +20,7 @@ class EsmeConfig{
 	uint32_t mysqlPort;
 	unsigned int smsctps;
 	unsigned int smscType;
+	std::string campaignType;
 	std::string mysqlUser;
 	std::string mysqlPass;
 	std::string mysqlDbName;
@@ -34,6 +35,11 @@ class EsmeConfig{
         Smpp::Ton bindTon;
         Smpp::Npi bindNpi;
         Smpp::AddressRange bindAddrRange;
+	// Message Queue
+	std::string vcMsgIdQueueName;
+	uint32_t vcMsgIdQueueMsgSize;
+	uint32_t vcMsgIdQueueNoOfMsg;
+
         int Open(const char *cfgFile );
         int Close(void);
 
@@ -47,6 +53,7 @@ class EsmeConfig{
 	uint32_t GetLogLevel(void);
 	uint32_t GetLogInterval(void);
 	// SMSC
+	std::string GetCampaignType(void);
 	std::string& GetSmscIp(void);
 	uint32_t GetSmscPort(void);
 	unsigned int GetSmscType(void);
@@ -63,6 +70,10 @@ class EsmeConfig{
 	std::string GetMysqlUser(void);
 	std::string GetMysqlPassword(void);
 	std::string GetMysqlDbName(void);
+	// Message Queue
+	std::string GetvcMsgIdQueueName(void);
+	uint32_t GetvcMsgIdQueueMsgSize(void);
+	uint32_t GetvcMsgIdQueueNoOfMsg(void);
 };
 #endif
 

@@ -6,32 +6,37 @@ extern Esme myEsme;
 thread_status_t G_CampaignThStatus=TH_ST_IDLE;
 
 uint32_t IsActiveCampaign(void){
-        CMySQL sqlobj;
         uint32_t campaignId=0;
         int errNo;
         char errMsg[256]={0x00};
         char tempBuff[256]={0x00};
+	if ( G_CampaignThStatus == TH_ST_RUNNING){
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "One Campaign is Already Running");
+		return 0;
+	}
+        CMySQL sqlobj;
         if(sqlobj.mcfn_Open(CG_MyAppConfig.GetMysqlIp().c_str(), CG_MyAppConfig.GetMysqlDbName().c_str(), CG_MyAppConfig.GetMysqlUser().c_str(), CG_MyAppConfig.GetMysqlPassword().c_str()) ){
-                std::cout << "Connection Estalishe to Database" << std::endl;
-
+		APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connected To Data Base");
         }else{
-                // Log Error
+                APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Failed To Connect to Data Base %s",CG_MyAppConfig.GetMysqlDbName().c_str() );
                 return 0;
         }
         std::string activeCampaignQuery = "SELECT iSNo FROM CampaignMaster WHERE iActive= 1 AND iStatus=";
         sprintf(tempBuff, "%d", CAMPAIGN_ST_SCHEDULED);
         activeCampaignQuery += tempBuff;
-        activeCampaignQuery += " AND dtScheduleDatetime < NOW() LIMIT 1";
+        activeCampaignQuery += " AND dtScheduleDatetime < NOW() AND iCampaignType IN (";
+	activeCampaignQuery += CG_MyAppConfig.GetCampaignType();
+	activeCampaignQuery +=  ") LIMIT 1";
         if(sqlobj.mcfn_GetResultSet(activeCampaignQuery.c_str(), errNo, errMsg)){
-                std::cout << "Query Executed" << activeCampaignQuery <<std::endl;
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "CAMPAIGN QUERY= %s ", activeCampaignQuery.c_str() );
         }else{
-                std::cout << "Problem in Excuting Query" << activeCampaignQuery << std::endl;
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "CAMPAIGN QUERY= %s ERROR= %s ", activeCampaignQuery.c_str(), errMsg );
                 return 0;
         }
         MYSQL_ROW tempRow;
         tempRow = mysql_fetch_row(sqlobj.m_pRecordsetPtr);
         if(tempRow){
-                std::cout << "result="<< tempRow[0] << std::endl;
+		APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Active Campaign Found with ID=%s", tempRow[0]);
                 campaignId = atoi(tempRow[0]);
         }
         mysql_free_result(sqlobj.m_pRecordsetPtr);
@@ -41,6 +46,7 @@ uint32_t IsActiveCampaign(void){
 void * CampaignThread(void *arg){
 	uint32_t campaignId = *(uint32_t *) arg;
 	uint32_t campaignStatus = 0;
+	int32_t campaign_error_cnt = 0;
 	int errNo;
 	char errMsg[256]={0x00};
 	char tempBuff[256]={0x00};
@@ -52,7 +58,6 @@ void * CampaignThread(void *arg){
 		return NULL;
 	}
 	if(sqlobj.mcfn_Open(CG_MyAppConfig.GetMysqlIp().c_str(), CG_MyAppConfig.GetMysqlDbName().c_str(), CG_MyAppConfig.GetMysqlUser().c_str(), CG_MyAppConfig.GetMysqlPassword().c_str()) ){
-		std::cout << "Connection Estalishe to Database" << std::endl;
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Connected To Database");
 	}else{
 		G_CampaignThStatus = TH_ST_STOP ;
@@ -65,10 +70,8 @@ void * CampaignThread(void *arg){
 	sprintf(tempBuff, "%d", campaignId);
 	campaignDataQuery += tempBuff ;
 	if(sqlobj.mcfn_GetResultSet(campaignDataQuery.c_str(), errNo, errMsg)){
-		std::cout << "Query Executed" << std::endl;
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "QUERY: %s : SUCESS", campaignDataQuery.c_str());
 	}else{
-		std::cout << "Problem in Excuting Query" << campaignDataQuery << std::endl;
 		G_CampaignThStatus = TH_ST_STOP ;
 		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "QUERY: %s : FAIL", campaignDataQuery.c_str());
 		return NULL;
@@ -87,9 +90,8 @@ void * CampaignThread(void *arg){
 	sprintf(tempBuff, "%d", campaignId);
 	campaignStatusUpdateQuery += tempBuff;
 	if(sqlobj.mcfn_Execute(campaignStatusUpdateQuery.c_str(), errNo, errMsg)){
-		std::cout << "Query Executed" << std::endl;
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG,"Query Executed\n");
 	}else{
-		std::cout << "Problem in Excuting Query" << campaignStatusUpdateQuery << std::endl;
 		G_CampaignThStatus = TH_ST_STOP ;
 		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "QUERY: %s : FAIL", campaignStatusUpdateQuery.c_str());
 		return NULL;
@@ -101,7 +103,7 @@ void * CampaignThread(void *arg){
 	msisdnPickingQuery += tempBuff;
 	msisdnPickingQuery +=" AND iStatus=";
 	memset(tempBuff, 0x00, sizeof(tempBuff));
-	sprintf(tempBuff, "%d", SMS_ST_NOT_PICKED);
+	sprintf(tempBuff, "%d",  SMS_ST_SCHEDULED);
 	msisdnPickingQuery += tempBuff;
 	msisdnPickingQuery += " LIMIT ";
 	memset(tempBuff, 0x00, sizeof(tempBuff));
@@ -119,12 +121,25 @@ void * CampaignThread(void *arg){
 		msisdnWindowUpdate += tempBuff;
 		msisdnWindowUpdate += " AND iSNo IN (";
 		std::string submittedMsisdn;
+		if(!sqlobj.mcfb_isConnectionAlive()){
+			sqlobj.mcfn_reconnect();
+			APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "RECONNECTING MYSQL");
+		} // Temp Solution Of Mysql Dropped Connection issue
 		if(sqlobj.mcfn_GetResultSet(msisdnPickingQuery.c_str(), errNo, errMsg)){
-			std::cout << "Query Executed" << msisdnPickingQuery << std::endl;
+			//std::cout << "Query Executed" << msisdnPickingQuery << std::endl;
+			campaign_error_cnt = 0; // reset Counter As Able to connect to Mysql
 		}else{
-			std::cout << "Problem in Excuting Query" << msisdnPickingQuery << std::endl;
+			APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Problem in Excuting Query : %s ", msisdnPickingQuery.c_str());
 			// Set ERROR Message/state
-			break;
+			//break;
+			// 1.TODO Below are workarround for Mysql Dropped Connection issue
+			campaign_error_cnt ++;
+			if(campaign_error_cnt > MAX_CAMPAIN_ERROR){
+				APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "Maximum Error Happen For Mysql Stopping Campaign with ID= %d", campaignId);
+				break;
+			}else{
+				continue; // Try To Get Campaign Data Again From Mysql 
+			}
 		}
 		MYSQL_ROW tempRow=NULL;
 		sms_data_t tempSmsData;
@@ -157,12 +172,23 @@ void * CampaignThread(void *arg){
 			submittedMsisdn.pop_back();
 			msisdnWindowUpdate += submittedMsisdn;
 			msisdnWindowUpdate += ")";
+			// 1.TODO Mysql Connection Timeout issue
+			if(!sqlobj.mcfb_isConnectionAlive()){
+				sqlobj.mcfn_reconnect();
+				APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "RECONNECTING MYSQL");
+			} // Temp Solution Of Mysql Dropped Connection issue
 			if(sqlobj.mcfn_Execute(msisdnWindowUpdate.c_str(), errNo, errMsg)){
-				std::cout << "Query Executed" << std::endl;
+				APP_LOGGER(CG_MyAppLogger, LOG_DEBUG,"Query Executed");
+				campaign_error_cnt = 0 ; // reset counter 
 			}else{
-				std::cout << "Problem in Excuting Query" << msisdnWindowUpdate << std::endl;
+				APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "Problem in Excuting Query: %s :: %d :: %s", msisdnWindowUpdate.c_str(), errNo, errMsg);
 				// Set ERROR Message/status
-				break;
+				//break;
+				campaign_error_cnt ++;
+				if(campaign_error_cnt > MAX_CAMPAIN_ERROR){
+					APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "Maximum Error Happen For Mysql Stopping Campaign with ID= %d", campaignId);
+					break;
+				}
 			}
 		}else{
 			// No Further Record
@@ -181,9 +207,9 @@ void * CampaignThread(void *arg){
 	sprintf(tempBuff, "%d", campaignId);
 	campaignStatusUpdateQuery += tempBuff;
 	if(sqlobj.mcfn_Execute(campaignStatusUpdateQuery.c_str(), errNo, errMsg)){
-		std::cout << "Query Executed" << std::endl;
+		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Query Executed\n" );
 	}else{
-		std::cout << "Problem in Excuting Query" << campaignStatusUpdateQuery << std::endl;
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "Problem in Excuting Query: %s", campaignStatusUpdateQuery.c_str());
 		G_CampaignThStatus = TH_ST_STOP ;
 		return NULL;
 	}

@@ -92,6 +92,10 @@ int EsmeConfig::Load(const char *cfgFile){
 			smscType = 1; // Default is Receiving
 		}
 	}
+	memset(value, 0x00, sizeof(value));
+	if(appconfig_getvalue(myconfig, "smsc", "campaigntype", value)==0){
+		campaignType = value;
+	}
 	// BIND
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "system_id", value)==0){
@@ -123,6 +127,20 @@ int EsmeConfig::Load(const char *cfgFile){
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "address_range", value)==0){
 		bindAddrRange = value;
+        }
+	memset(value, 0x00, sizeof(value));
+	if(appconfig_getvalue(myconfig, "messagequeue", "vcmsgidque_name", value)==0){
+		vcMsgIdQueueName = value;
+        }
+	memset(value, 0x00, sizeof(value));
+	if(appconfig_getvalue(myconfig, "messagequeue", "vcmsgidque_msg_size", value)==0){
+		vcMsgIdQueueMsgSize = 256;
+                vcMsgIdQueueMsgSize = atoi(value);
+        }
+	memset(value, 0x00, sizeof(value));
+	if(appconfig_getvalue(myconfig, "messagequeue", "vcmsgidque_no_of_msg", value)==0){
+		vcMsgIdQueueNoOfMsg = 10;
+		vcMsgIdQueueNoOfMsg = atoi(value);
         }
 	
 	Close();
@@ -207,3 +225,20 @@ std::string EsmeConfig::GetMysqlDbName(void){
 unsigned int EsmeConfig::GetSmscType(void){
 	return smscType;
 }
+
+std::string EsmeConfig::GetCampaignType(void){
+	return campaignType;
+}
+
+std::string EsmeConfig::GetvcMsgIdQueueName(void){
+	return vcMsgIdQueueName;
+}
+
+uint32_t EsmeConfig::GetvcMsgIdQueueMsgSize(void){
+	return vcMsgIdQueueMsgSize;
+}
+
+uint32_t EsmeConfig::GetvcMsgIdQueueNoOfMsg(void){
+	return vcMsgIdQueueNoOfMsg;
+}
+
