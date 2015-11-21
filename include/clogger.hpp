@@ -41,6 +41,13 @@ extern "C" {
 	logger_unlock(OBJECT);\
 	}
 
+#define HEX_LOGGER(OBJECT, LOG_LEVEL, LOGDATA, DATALENGTH) {\
+	logger_lock(OBJECT);\
+        logger_log_header(OBJECT, LOG_LEVEL, __FILE__, __LINE__);\
+	logger_log_hexdump(OBJECT,  LOGDATA, DATALENGTH);\
+	logger_unlock(OBJECT);\
+        }
+
 #define DFL_NAME "united"
 #define DFL_PATH "."
 #define DFL_TAG "LOG"
@@ -77,6 +84,7 @@ int logger_unlock(logger_p);
 int logger_set(logger_p, unsigned int option, const char *);
 int logger_log_header(logger_p log, unsigned int log_level, const char *srcname, unsigned int line_no);
 int logger_log_message(logger_p ,const char *format ,...);
+int logger_log_hexdump(logger_p log, const void *data, unsigned int length);
 #ifdef __cplusplus
 }
 #endif

@@ -31,9 +31,13 @@ libsmppapputil_la_SOURCES = clogger.cpp appconfig.cpp NetBuffer.cpp MySqlWrapper
 libsmppapputil_la_CPPFLAGS = -fPIC -I ${top_srcdir}/include ${libxml2_CFLAGS} -std=c++11 `mysql_config --cflags`
 libsmppapputil_la_LDFLAGS = -shared -fPIC ${libxml2_LIBS} `mysql_config --libs`
 
-bin_PROGRAMS = myesme 
-myesme_SOURCES = Main.cpp Esme.cpp EsmeConfig.cpp Externs.cpp SmsCampaign.cpp
-myesme_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS} -std=c++11 `mysql_config --cflags` -D_MYSQL_UPDATE_
-myesme_LDFLAGS = ${libxml2_LIBS} libsmpp.la libsmppapputil.la -lpthread `mysql_config --libs`
+bin_PROGRAMS = myesme esmedbins
+myesme_SOURCES = Main.cpp Esme.cpp EsmePduProcessThread.cpp EsmeSenderThread.cpp EsmeConfig.cpp SmsAppConfig.cpp Externs.cpp SmsCampaign.cpp EsmeGetterSetter.cpp MessageQueue.cpp
+myesme_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS} -std=c++11 `mysql_config --cflags` -D_MESSAGE_QUEUE_UPDATE_
+myesme_LDFLAGS = ${libxml2_LIBS} libsmpp.la libsmppapputil.la -lpthread `mysql_config --libs` -lrt
+
+esmedbins_SOURCES = SmsDbInsertConfig.cpp DbInsertApp.cpp MessageQueue.cpp
+esmedbins_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS} -std=c++11 `mysql_config --cflags` -D_MESSAGE_QUEUE_UPDATE_
+esmedbins_LDFLAGS = ${libxml2_LIBS} libsmppapputil.la -lpthread `mysql_config --libs` -lrt
 
 sysconf_DATA = MyEsme.xml 

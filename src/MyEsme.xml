@@ -11,7 +11,7 @@
 		<ip>127.0.0.1</ip>
 		<port>3306</port>
 		<user>root</user>
-		<password>padmapur</password>
+		<password>mysqlpass</password>
 		<name>smstest</name>
 	</mysql>
 	<smsc>
@@ -19,6 +19,7 @@
 		<port>2775</port>
 		<tps>100</tps>
 		<type>Rx</type>
+		<campaigntype>1,3,5</campaigntype>
 	</smsc>
 	<bind>
 		<system_id>smppclient1</system_id>

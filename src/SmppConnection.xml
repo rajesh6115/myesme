@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MyEsme>
+        <mysql>
+                <ip>127.0.0.1</ip>
+                <port>3306</port>
+                <user>root</user>
+                <password>mysqlpass</password>
+                <name>smstest</name>
+        </mysql>
+        <smsc>
+                <ip>127.0.0.1</ip>
+                <port>2775</port>
+                <tps>100</tps>
+                <type>Tx</type>
+                <campaigntype>0,1,5,7</campaigntype>
+        </smsc>
+        <bind>
+                <system_id>smppclient1</system_id>
+                <password>password</password>
+                <system_type>VMA</system_type>
+                <interface_version>5.0</interface_version>
+                <ton>0</ton>
+                <npi>0</npi>
+                <address_range></address_range>
+        </bind>
+	<messagequeue>
+                <updateqryque_name>/updqryqueu</updateqryque_name>
+                <updateqryque_msg_size>256</updateqryque_msg_size>
+                <updateqryque_no_of_msg>60000</updateqryque_no_of_msg>
+        </messagequeue>
+</MyEsme>
+

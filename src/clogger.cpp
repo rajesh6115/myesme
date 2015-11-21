@@ -192,6 +192,8 @@ int logger_log_header(logger_p log, unsigned int log_level, const char *srcname,
 {
 	int ret_val = 0;
 	struct tm cur_time;
+	struct tm cur_ftime;
+        struct tm create_ftime;
 	time_t temp_time;
 	char logtag[64]={0x00};
 	if(log == NULL)
@@ -209,11 +211,18 @@ int logger_log_header(logger_p log, unsigned int log_level, const char *srcname,
 		logger_open(log);  // If Logger is running for first time
 	}
 	/////check for new file generation condition///////////
+	// TODO : generate a file if min == 0 so that logs will be in sync
 	temp_time = time(NULL);
 	if((temp_time - log->create_time) > log->interval)
 	{
 		logger_open(log);
 	}
+	// for Sysnc For Hour Wise
+        localtime_r(&temp_time, &cur_ftime);
+        localtime_r(&log->create_time, &create_ftime);
+        if((cur_ftime.tm_min == 0) and (cur_ftime.tm_hour != create_ftime.tm_hour)){
+                logger_open(log);
+        }
 	/////prepare tag//////////
 	//time(&temp_time);
 	temp_time = time(NULL);
@@ -249,4 +258,24 @@ int logger_log_message(logger_p log, const char *format, ...)
 	fflush(log->fp);
 	va_end(args);
 	return ret_val;
+}
+
+int logger_log_hexdump(logger_p log, const void *data, unsigned int length)
+{
+	int ret_val = 0;
+	if(log ==NULL){
+		return -1;
+	}
+	if(log->is_log == 0){
+		return 0;
+	}
+	unsigned char ch;
+	unsigned char * print_data = (unsigned char *)data;
+	fprintf(log->fp, "[");
+        for(unsigned int i=0; i < length; i++){
+                ch = (unsigned char)print_data[i];
+                fprintf(log->fp, "%02X",ch);
+        }
+        fprintf(log->fp, "]\n");
+
 }
