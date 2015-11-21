@@ -88,27 +88,4 @@ void NetBuffer::Erase(void){
 		this->m_length=0;
 	}
 }
-/**
-* Erase buffer starting fron begin upto end
-* begin should less than end
-*/
-void NetBuffer::Erase(unsigned int begin, unsigned int end){
-	if(this->m_length != 0){
-		if(begin >= end ){
-			return;
-		}
-		if(this->m_length > begin && this->m_length >= end){
-			int tempLen = this->m_length - (end - begin);
-			char *tempBuf = new char[tempLen];
-			if(begin != 0){
-				memcpy(tempBuf, this->m_pbuffer,begin);
-			}
-			if( end != this->m_length){
-				memcpy(tempBuf+begin, this->m_pbuffer+end, tempLen-begin);
-			}
-			Erase();
-			Append(tempBuf, tempLen);
-			delete[]tempBuf;
-		}
-	}
-}
+

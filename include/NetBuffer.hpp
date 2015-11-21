@@ -17,7 +17,6 @@ class NetBuffer{
 	const char *GetBuffer(void) const;
 	int GetLength(void);
 	void Erase(void);
-	void Erase(unsigned int begin, unsigned int end);
 	NetBuffer& operator=(const NetBuffer &robj);
 };
 
