@@ -9,12 +9,15 @@
 
 CMySQL::CMySQL()
 {
+	m_pConnectionPtr = NULL;
+	m_pRecordsetPtr = NULL;
 }
 
 CMySQL::~CMySQL()
 {
-	if(m_pConnectionPtr!=NULL)
+	if(m_pConnectionPtr!=NULL){
 		mcfn_Close();
+	}
 } 
 
 int CMySQL::mcfn_Open(const char *cpDBSource, const char *cpDBName, const char *cpDBUserName, const char *cpDBPassword)
@@ -32,6 +35,8 @@ int CMySQL::mcfn_Open(const char *cpDBSource, const char *cpDBName, const char *
                         return DBSTATUS_ERROR;
                 else
                 {
+			mysql_options(m_pConnectionPtr, MYSQL_SET_CHARSET_NAME, "utf8");
+			mysql_options(m_pConnectionPtr, MYSQL_INIT_COMMAND, "SET NAMES utf8");
                         if (mysql_real_connect(m_pConnectionPtr, cpDBSource, cpDBUserName, cpDBPassword, cpDBName, 0, NULL, 0))
                                 return DBSTATUS_SUCCESS;
                         else
@@ -48,7 +53,9 @@ int CMySQL::mcfn_Open(const char *cpDBSource, const char *cpDBName, const char *
 
 int CMySQL::mcfn_Close()
 {
-        mysql_close(m_pConnectionPtr);
+	if(m_pConnectionPtr){
+		mysql_close(m_pConnectionPtr);
+	}
         m_pRecordsetPtr = NULL;
         m_pConnectionPtr = NULL;
         return DBSTATUS_SUCCESS;
@@ -56,6 +63,10 @@ int CMySQL::mcfn_Close()
 
 int CMySQL::mcfn_Execute(const char *cpExecuteQuery, int &iErrorCode, char *cpErrorInfo)
 {
+	if ( m_pConnectionPtr == NULL ){
+		strcpy(cpErrorInfo, "Not Connected To Mysql");
+                return DBSTATUS_ERROR;
+        }
         try
         {
                 meC_CriticalSection.lock();
@@ -68,8 +79,9 @@ int CMySQL::mcfn_Execute(const char *cpExecuteQuery, int &iErrorCode, char *cpEr
                 } 
                 else
                 {
-                        meC_CriticalSection.unlock();			
 			iErrorCode = mysql_errno(m_pConnectionPtr);
+                	strcpy(cpErrorInfo, mysql_error(m_pConnectionPtr));
+                        meC_CriticalSection.unlock();			
                         return DBSTATUS_ERROR;
                 }
         }
@@ -84,35 +96,41 @@ int CMySQL::mcfn_Execute(const char *cpExecuteQuery, int &iErrorCode, char *cpEr
 
 int CMySQL::mcfn_GetResultSet(const char *cpSQLQuery, int &iErrorCode, char *cpErrorInfo)
 {
-        try
-        {
-                meC_CriticalSection.lock();
-                int iReturn = -1;
-                iReturn = mysql_real_query(m_pConnectionPtr, cpSQLQuery,strlen(cpSQLQuery));
-                if (iReturn > 0)
-                {
-                        meC_CriticalSection.unlock();
-			iErrorCode = mysql_errno(m_pConnectionPtr);
-                        return DBSTATUS_ERROR;
-                }
-                m_pRecordsetPtr = mysql_store_result(m_pConnectionPtr);
-        }
-        catch (...)
-        {
-                iErrorCode = mysql_errno(m_pConnectionPtr);
-                strcpy(cpErrorInfo, mysql_error(m_pConnectionPtr));
 
-                meC_CriticalSection.unlock();
-                return DBSTATUS_ERROR;
-        }
-        meC_CriticalSection.unlock();
-        return DBSTATUS_SUCCESS;
+	if ( m_pConnectionPtr == NULL ){
+		strcpy(cpErrorInfo, "Not Connected To Mysql");
+		return DBSTATUS_ERROR;
+	}
+	try
+	{
+		meC_CriticalSection.lock();
+		int iReturn = -1;
+		iReturn = mysql_real_query(m_pConnectionPtr, cpSQLQuery,strlen(cpSQLQuery));
+		if (iReturn > 0)
+		{
+			iErrorCode = mysql_errno(m_pConnectionPtr);
+                	strcpy(cpErrorInfo, mysql_error(m_pConnectionPtr));
+			meC_CriticalSection.unlock();
+			return DBSTATUS_ERROR;
+		}
+		m_pRecordsetPtr = mysql_store_result(m_pConnectionPtr);
+	}
+	catch (...)
+	{
+		iErrorCode = mysql_errno(m_pConnectionPtr);
+		strcpy(cpErrorInfo, mysql_error(m_pConnectionPtr));
+
+		meC_CriticalSection.unlock();
+		return DBSTATUS_ERROR;
+	}
+	meC_CriticalSection.unlock();
+	return DBSTATUS_SUCCESS;
 }
 
 int CMySQL::mcfn_reconnect()
 {
 	meC_CriticalSection.lock();
-        mysql_close(m_pConnectionPtr);
+        mcfn_Close();
         m_pConnectionPtr = NULL;
 	try
         {
@@ -124,6 +142,8 @@ int CMySQL::mcfn_reconnect()
 		}
                 else
                 {
+			mysql_options(m_pConnectionPtr, MYSQL_SET_CHARSET_NAME, "utf8");
+			mysql_options(m_pConnectionPtr, MYSQL_INIT_COMMAND, "SET NAMES utf8");
                         if (mysql_real_connect(m_pConnectionPtr, strDbSource.c_str(), strDbUserName.c_str(), strDbPassword.c_str(), strDbName.c_str(), 0, NULL, 0))
 			{
 				meC_CriticalSection.unlock();
@@ -176,13 +196,17 @@ long CMySQL::mcfl_getNumCols()
 int CMySQL::mcfS_getFieldType(int siL_OffSet)
 {
 	MYSQL_FIELD *tmp;
-	tmp = mysql_fetch_field_direct(m_pRecordsetPtr,siL_OffSet);
+	if(m_pRecordsetPtr != NULL){
+		tmp = mysql_fetch_field_direct(m_pRecordsetPtr,siL_OffSet);
+	}
 	return tmp->type;
 }
 	
 char *CMySQL::mcfS_getFieldName(int siL_OffSet)
 {
 	MYSQL_FIELD *tmp;
-	tmp = mysql_fetch_field_direct(m_pRecordsetPtr,siL_OffSet);
+	if(m_pRecordsetPtr != NULL){
+		tmp = mysql_fetch_field_direct(m_pRecordsetPtr,siL_OffSet);
+	}
 	return tmp->name;
 }

@@ -44,16 +44,30 @@ int main(int argc, char *argv[]){
 	while(IS_PROCESS_RUN){
 		// Check Type Of Connection 
 		// If Tx or RDWR Then Only Start Campaign Other Wise Just Wait For Other Thread Finish There Job
-//		printf("SMSC TYPE= %u \n", CG_MyAppConfig.GetSmscType());
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "SMSC TYPE= %u ", CG_MyAppConfig.GetSmscType());
 		if((CG_MyAppConfig.GetSmscType() == Esme::BIND_WRONLY) || (CG_MyAppConfig.GetSmscType()==Esme::BIND_RDWR)){
 			if(campaignId = IsActiveCampaign()){
-				std::cout << "There is a Active Campaign with Campaign Id " << campaignId << std::endl;
+				APP_LOGGER(CG_MyAppLogger,LOG_DEBUG, "There is a Active Campaign with Campaign Id %u",campaignId);
+				// TODO : Multiple Campaign At a time
+				// If One Campaign is Running We Should Not Start Another One
+				// Make thread pool for campaigns. So that There will be limited threads 
+				// to schedule
+				// 1. Quick fix done using thread status for campaign thread in IsActiveCampaign
 				if(pthread_create(&campaignThId, NULL, CampaignThread, &campaignId)==0){
-//					std::cout << "Starting Campaign with Campaign ID " << campaignId << std::endl;
 					APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Starting Campaign with Campaign ID %u ", campaignId);
 					sleep(5); // Give time To Start later change with thread status logic
 				}
+			}
+		}
+		if(myEsme.GetEsmeState() == Esme::ST_ERROR){
+			APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "SMSC ERROR OCCURED ");
+			myEsme.Stop();
+		}
+		if(myEsme.GetEsmeState() == Esme::ST_IDLE){
+			APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "RE-CONNECTING TO SMSC");
+			if(myEsme.Start() == -1){
+				APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "FAIL TO RE-CONNECTING TO SMSC. TRY TO CONNECT AFTER 60 SEC");
+				sleep(60);
 			}
 		}
 		sleep(DFL_SLEEP_VALUE);
