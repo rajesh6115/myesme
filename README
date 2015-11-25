@@ -1,52 +1,30 @@
-              FEATURES
----------------------------------
-1. Can Bind as Tx, Rx or TRx
-2. Logging of message in files
-3. Configurable
-4. Modulised by Job Deviding in Threads
-5. Can UnBind at any Time Safely
-6. Multi Campaign
-7. Multi esme connection
-8. Esme Operation Status Report
-9. Use of SmsmtMulti for More Through put
-10. Integration of thrift to ondemand services realtime
-11. Auto Config From Configuration file
-12. Reload of Config in REAL-TIME ONDEMAND
-13. Conjection Management Logic For SubmitSm DeliverySm MaximumQueue in PDU 
-14. Persitense Management
-15. Esme Status Report Generation AND Alerts If Required
+This is an ESME Implementation Using SMPP protocol.
+Learing Project Where you can find steps in developing this BULKSMS project.
 
+STEPS
+------
+1. Just Simple Sending SMS usin submitsm pdu
+2. Made Application Recive Deliversm pdu for Delivery report
+3. Made Application to support unicode and flash sms concept
+4. Made Application to fetch smses from mysql database
+5. Changed logic of updating sms status directly to mysql
+6. Made Application to support multiple campaign
+7. Made Application to support multiple SMPP clients/multibind
+8. used std::map for storing intermediate states
+9. added thereadpool concept to get high performance
 
-            WORKING FEATURES
----------------------------------------
-1. Sending SMS From Campaign
-2. Conjection Management
-3. High tps By Independent Sender 
+TESTS AND RESULTS
+------------------
+1. mysql is performing low (AS I am not good in mysql concepts)
+2. POSIX message queues (Good But Required to change OS limits and permissions)
 
+NOTE:
+-----
+1. In my test setup i am able to get 100 sms/sec with single connection to my test setup (no network latency)
+2. with 2 tx binds i am able to get 200 sms/sec 
+3. with 5 tx binds I am able to get 500 sms/sec but memory usage touching 800Mb almost, If I am not getting delivery reports from SMSC Application is crashing after 25,00,000 submitsm. which is not good.
 
-            TODOS
----------------------------------------
-1. Better Congetion Management By Strong Resending Logic
-2. NOT USE Any #define variables move threm to enums or Configuration
-3. Query Forming Logic, Passing Logic to a Different Process For Better tps
-4. Complete MULTISM and MULTISMRESP
-5. Multi Campaign Logic Developement
-6. Removing all Print to console statement add Log inplace if required
-7. SMS Delivery Report Checking
-8. Make ESME Statefull
-9. Support Outbind
-10. Move All Starting Logic to Start and Stoping Logic To Stop Of Esme
-11. Use Counters/Timers to Close Connection Sucessfully
-12. Make Linkcheck Thread Rubust by Implemention Re-Connect to SMSC Logic
-13. Make RnD for DeliverySm Logic and DeliverySmResp
-14. Regorous test for working features
-
-          HIGH PRIORITY
------------------------------------------------------------
-1. Implement hexdump in logger
-2. Reconnect Logic
-3. Unicode Support
-4. Flash Message Support
+IN ALL SENARIO CPU USAGE IS VERY LESS BELOW 10%. (I have 4 core i5 4th gen CPU with 8Gb RAM)
 
 HOW TO INSTALL
 -----------------------------------------------
@@ -61,3 +39,20 @@ HOW TO INSTALL
 	# make
 5. Install Project
 	# make install or sudo make install
+
+HOW TO START APPLICATION
+------------------------
+Application need configuration file from where application will get important informations. Sample configuration files also included.
+1. Main Applicatio config file (src/MySmsAppConfig.xml)
+2. SMPP Connection config file (src/SmppConnection.xml)
+
+STEP 1: MODIFY Configfiles according to your testsetup 
+STEP 2: myesme <main configuration file>
+	ex: sudo /usr/bin/myesme /usr/etc/MySmsAppConfig.xml&
+
+
+APPLICATION LOG
+----------------
+PATH: you can set path in main app config file
+it can be like /var/log/myesme/xxxxxx.log
+

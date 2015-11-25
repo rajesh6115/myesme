@@ -1,7 +1,7 @@
 # Autoconf Minimum Version Required Check
 AC_PREREQ([2.68])
 # Initilise Autoconf with project Name and Version Details
-AC_INIT([libsmpp], [1.0.0], [sahoorajesh.d@gmail.com], [libsmpp], [https://github.com/rajesh6115])
+AC_INIT([myesme], [1.0.0], [sahoorajesh.d@gmail.com], [myesme], [https://github.com/rajesh6115])
 # Put autotools auxiliary files in a subdir, so they don't clutter top dir:
 AC_CONFIG_AUX_DIR([build-aux])
 # Initialise Automake with Default version Number and Default CPP flags
