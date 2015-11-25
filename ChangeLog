@@ -1,0 +1,18 @@
+[33m7f147e7[m[33m ([1;36mHEAD[m[33m, [1;32mmaster[m[33m)[m Merge branch 'release-1.0.0'
+[33m07945ae[m[33m ([1;32mrelease-1.0.0[m[33m)[m Finally reached a stage to release. This is candidate for release of ver 1.0.0
+[33m7074e0f[m[33m ([1;31morigin/master-dev[m[33m, [1;31morigin/master[m[33m, [1;31morigin/HEAD[m[33m, [1;32mredis[m[33m, [1;32mmaster-dev[m[33m)[m Merge branch 'threadpool'
+[33md93fc02[m [threadpool] modified according to threadpool
+[33m886e703[m Merge branch 'master' into threadpool
+[33m3212ad4[m [threadpool] Threadpool Logic Taken form log4cpp, All changes done to support threadpool
+[33m1b7d51b[m Merge pull request #2 from rajesh6115/messagequeue
+[33mcdf0af5[m [clean] cleaning code
+[33me3bbe53[m [messagequeue] Adding POSIX message queues to avoid database latency for updating reports
+[33m90aab12[m [multicampaign] introducing multi campaign logic to handle multi campaign
+[33mf3db589[m [multibind] implemenatation of smpp connection manager with auto reconnect logic for smpp connection in link check thread
+[33m4b67b45[m [rel v1] Ready To Send SMS and Receive Delivery Report
+[33m67b5516[m [config] tested changes for single campaign
+[33mb4eeac8[m added sms picking logic from mysql
+[33md406930[m updated configure for smsc and logger
+[33m057b1d9[m m4 folder added to remove alocale warning
+[33md73ba13[m Adding Basic Implementation
+[33mcc3076f[m Initial commit
