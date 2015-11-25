@@ -49,6 +49,12 @@
 5. separating libs from main project like libsmpp and utils
 6. USE OF HEXDUMP FOR LOGGING 
 
+          HIGH PRIORITY
+-----------------------------------------------------------
+1. Implement hexdump in logger
+2. Reconnect Logic
+3. Unicode Support
+4. Flash Message Support
 
           HIGH PRIORITY
 -----------------------------------------------------------

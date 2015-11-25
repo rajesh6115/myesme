@@ -30,5 +30,10 @@
 		<npi>0</npi>
 		<address_range></address_range>
 	</bind>
+	<messagequeue>
+		<vcmsgidque_name>/vcmsgidqueu</vcmsgidque_name>
+		<vcmsgidque_msg_size>256</vcmsgidque_msg_size>
+		<vcmsgidque_no_of_msg>100000</vcmsgidque_no_of_msg>
+	</messagequeue>
 
 </MyEsme>

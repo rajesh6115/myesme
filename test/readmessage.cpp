@@ -7,7 +7,7 @@ int main(int argc, char *argv[]){
 	if(smqObj.IsOpened()){
 		std::cout << "No Of Available Message is " << smqObj.NoOfMessagesInQueue() << std::endl;
 		char msg[512]={0x00};
-//		smqObj.Read(msg, 511);
+		smqObj.Read(msg, 511);
 		perror("mq:");
 		std::cout << "1st Message In Queue is " << msg << std::endl;
 		smqObj.Close();
