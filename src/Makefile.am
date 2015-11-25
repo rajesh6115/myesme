@@ -40,4 +40,4 @@ esmedbins_SOURCES = SmsDbInsertConfig.cpp DbInsertApp.cpp MessageQueue.cpp
 esmedbins_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS} -std=c++11 `mysql_config --cflags` -D_MESSAGE_QUEUE_UPDATE_
 esmedbins_LDFLAGS = ${libxml2_LIBS} libsmppapputil.la -lpthread `mysql_config --libs` -lrt
 
-sysconf_DATA = MyEsme.xml
+sysconf_DATA = MyEsme.xml 

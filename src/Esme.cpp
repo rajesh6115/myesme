@@ -148,6 +148,7 @@ Esme::Esme(std::string name, std::string cfgFile){
 	}
 #endif
 
+
 }
 
 bool Esme::IsSendSms(void){
@@ -166,14 +167,6 @@ Smpp::Uint32 Esme::GetNewSequenceNumber(void){
 	pthread_mutex_unlock(&m_seqNumLock); // Allow Other Thread To Get Seq Number
 	return tmp;
 }
-#ifdef _MSG_QUE_MSGID_MAP_
-int Esme::OpenConnection(std::string host, uint32_t portno, std::string msgIdqueName, uint32_t size, uint32_t msg_count){
-	m_msgIdQueueName = msgIdqueName;
-	m_sizePerMsgInMsgIdQueue = size;
-	m_noOfMsgsInMsgIdQueue = msg_count;
-	return Esme::OpenConnection( host, portno);
-}
-#endif
 
 int Esme::OpenConnection(void){
 	if(m_esmeSocket == -1){
@@ -298,11 +291,6 @@ int Esme::Read(NetBuffer &robj){
 		}else{
 			requireBytes = 0;
 		}
-	}while(requireBytes > 0);
-	requireBytes = Smpp::get_command_length((const Smpp::Uint8*)robj.GetBuffer()); // override requiredBytes as per pdu length parameter
-//	APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Require Bytes= 0x%08X ", requireBytes);
-	if( requireBytes > MAX_PDU_PRACTICAL_LENGTH ){
-		APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "Impractical PDU Length");
 	}
 	return 0;
 }
@@ -721,17 +709,8 @@ uint32_t Esme::NoOfSmsInQueue(void){
 // 3. Develope Logic To Map vcMsgId to iSNo irrespective of SMS Handles
 // 4. Implement DBname, DBTablename From SMPP Class or SMS Object
 int Esme::DoDatabaseUpdate(NetBuffer &tmpNetBuf){
-#ifdef _MSG_QUE_MSGID_MAP_
-// TODO : After Timer Designed Done 
-// Please Move This Section to Link CHeck Thread 
-// So That map will be updated Always
-	if(smscType == BIND_RDWR || smscType == BIND_RDONLY){
-		Esme::ReadFromMsgIdPersistenceQue();
-	}
-#endif
 	std::string myUpdateQuery;
 	char tmpBuffer[256]={0x00};
-	std::string currentTime;
 	Smpp::Uint32 commandId=0x00000000;
 	Smpp::Uint32 sequenceNumber=0x00000000;
 	time_t rawtime;

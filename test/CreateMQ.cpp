@@ -38,7 +38,7 @@ int main(int argc,char *argv[])
 	printf("Limit is %lu : %lu \n", rlim.rlim_cur, rlim.rlim_max);
 	attr.mq_flags = 0;
 	// Maximum Number Of Message
-        attr.mq_maxmsg = 50000;
+        attr.mq_maxmsg = 65000;
 	// Maximum Size Of Each Message
         attr.mq_msgsize= 256;
 	attr.mq_curmsgs = 0;  

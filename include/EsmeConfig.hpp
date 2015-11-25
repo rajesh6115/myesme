@@ -37,7 +37,6 @@ class EsmeConfig{
         ~EsmeConfig(void);
         int Load(const char *cfgFile );
 	// SMSC
-	std::string GetCampaignType(void);
 	std::string& GetSmscIp(void);
 	uint32_t GetSmscPort(void);
 	bind_type_t GetSmscType(void);
