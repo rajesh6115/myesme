@@ -2,16 +2,14 @@
 #include "MySqlWrapper.hpp"
 #include "Defines.hpp"
 #include "Esme.hpp"
-extern Esme myEsme;
-thread_status_t G_CampaignThStatus=TH_ST_IDLE;
 
 uint32_t IsActiveCampaign(void){
         uint32_t campaignId=0;
         int errNo;
         char errMsg[256]={0x00};
         char tempBuff[256]={0x00};
-	if ( G_CampaignThStatus == TH_ST_RUNNING){
-		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "One Campaign is Already Running");
+	if ( G_smsCampaignMap.size() >=  MAX_SMS_CAMPAIGN){
+		APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "LIMIT: Maximum %d Campaigns Can Run in Parallel", MAX_SMS_CAMPAIGN);
 		return 0;
 	}
         CMySQL sqlobj;
@@ -45,40 +43,65 @@ uint32_t IsActiveCampaign(void){
 
 void * CampaignThread(void *arg){
 	uint32_t campaignId = *(uint32_t *) arg;
+	char l_tableName[16] = {0x00};
 	uint32_t campaignStatus = 0;
 	int32_t campaign_error_cnt = 0;
 	int errNo;
 	char errMsg[256]={0x00};
 	char tempBuff[256]={0x00};
 	CMySQL sqlobj;
-	if(myEsme.GetEsmeState() != Esme::ST_BIND){
-		// After Esme in BIND state allow Campaign thread
-		// Also Add conditiion for type of binding as it is not required for rx
-		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "Esme Not Binded But Campaign Starting....");
+	std::map<uint32_t, campaign_info_t>::iterator l_campaignItr;
+	l_campaignItr = G_smsCampaignMap.find(campaignId);
+	if(l_campaignItr != G_smsCampaignMap.end()){
+		l_campaignItr->second.thStatus = TH_ST_RUNNING;
+	}else{
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "No Entries in Campaign Map ID %u Exiting...", campaignId);
 		return NULL;
 	}
+	// Prepare SMPP Connection List
+	std::list<Esme *> l_esmeInstanceList;
+	std::list<Esme *>::iterator l_esmeItr = l_esmeInstanceList.begin();
+	Esme *tempSmppConObj=NULL;
+	for(int i=0; i< CG_MyAppConfig.GetMaxinumSmppConnection(); i++){
+		tempSmppConObj = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i));
+		if(tempSmppConObj){
+			if(tempSmppConObj->GetEsmeType() != BIND_RDONLY){
+				// Add to List
+				l_esmeInstanceList.push_back(tempSmppConObj);
+			}
+		}
+	}
+	if(l_esmeInstanceList.empty()){
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR: No Tx OR TRx Bind Available");
+		l_campaignItr->second.thStatus = TH_ST_STOP ;
+		sleep(SMS_CAMPAIGN_PICK_SLEEP); // Give Some Sleep Before Picking Same Campaign Again
+		return NULL;
+	}
+
 	if(sqlobj.mcfn_Open(CG_MyAppConfig.GetMysqlIp().c_str(), CG_MyAppConfig.GetMysqlDbName().c_str(), CG_MyAppConfig.GetMysqlUser().c_str(), CG_MyAppConfig.GetMysqlPassword().c_str()) ){
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Connected To Database");
 	}else{
-		G_CampaignThStatus = TH_ST_STOP ;
-		// Log Error
+		l_campaignItr->second.thStatus = TH_ST_STOP ;
 		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "NOT ABLE TO CONNECT TO MYSQL");
 		return NULL;
 	}
 
-	std::string campaignDataQuery="SELECT vcSource,iCampaignType FROM CampaignMaster WHERE iSNO=";
+	std::string campaignDataQuery="SELECT vcSource,vcTableName FROM CampaignMaster WHERE iSNO=";
 	sprintf(tempBuff, "%d", campaignId);
 	campaignDataQuery += tempBuff ;
 	if(sqlobj.mcfn_GetResultSet(campaignDataQuery.c_str(), errNo, errMsg)){
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "QUERY: %s : SUCESS", campaignDataQuery.c_str());
 	}else{
-		G_CampaignThStatus = TH_ST_STOP ;
+		l_campaignItr->second.thStatus = TH_ST_STOP ;
 		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "QUERY: %s : FAIL", campaignDataQuery.c_str());
 		return NULL;
 	}
 	MYSQL_ROW tempRow;
 	tempRow = mysql_fetch_row(sqlobj.m_pRecordsetPtr);
-	std::cout << "RESULT: " << "CampaignId" << campaignId << ":" <<tempRow[0] << ":" << std::endl;
+	//std::cout << "RESULT: " << "CampaignId" << campaignId << ":" <<tempRow[0] << ":" << std::endl;
+	APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "RESULT: %d : %s ", campaignId, tempRow[0]);
+	memset(l_tableName, 0x00, sizeof(l_tableName));
+	strcpy(l_tableName, tempRow[1]);
 	mysql_free_result(sqlobj.m_pRecordsetPtr);
 	// Update Campaign So that it will not pick again
 	std::string campaignStatusUpdateQuery = "UPDATE CampaignMaster SET iStatus=";
@@ -92,12 +115,14 @@ void * CampaignThread(void *arg){
 	if(sqlobj.mcfn_Execute(campaignStatusUpdateQuery.c_str(), errNo, errMsg)){
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG,"Query Executed\n");
 	}else{
-		G_CampaignThStatus = TH_ST_STOP ;
+		l_campaignItr->second.thStatus = TH_ST_STOP ;
 		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "QUERY: %s : FAIL", campaignStatusUpdateQuery.c_str());
 		return NULL;
 	}
 	// Start Push Processing Campaign
-	std::string msisdnPickingQuery = "SELECT iSNo,vcSource,vcMsisdn,vcMessage,iMsgType FROM SMSMT WHERE iCampaignId=";
+	std::string msisdnPickingQuery = "SELECT iSNo,vcSource,vcMsisdn,vcMessage,iMsgType FROM ";
+	msisdnPickingQuery += l_tableName;
+	msisdnPickingQuery += " WHERE iCampaignId=";
 	memset(tempBuff, 0x00, sizeof(tempBuff));
 	sprintf(tempBuff, "%d", campaignId);
 	msisdnPickingQuery += tempBuff;
@@ -109,13 +134,16 @@ void * CampaignThread(void *arg){
 	memset(tempBuff, 0x00, sizeof(tempBuff));
 	sprintf(tempBuff, "%d", SMS_CAMPAIGN_WINDOW_SIZE);
 	msisdnPickingQuery += tempBuff;
-	G_CampaignThStatus = TH_ST_RUNNING;
-	while(G_CampaignThStatus == TH_ST_RUNNING){
-		std::string msisdnWindowUpdate = "UPDATE SMSMT SET iStatus=";
+	l_campaignItr->second.thStatus = TH_ST_RUNNING;
+	while(l_campaignItr->second.thStatus == TH_ST_RUNNING){
+		// TODO: If  Time Reached 9 PM Stop Campaign
+		std::string msisdnWindowUpdate = "UPDATE ";
+		msisdnWindowUpdate += l_tableName;
+		msisdnWindowUpdate += " SET iStatus=";
 		memset(tempBuff, 0x00, sizeof(tempBuff));
 		sprintf(tempBuff, "%d", SMS_ST_PICKED);
 		msisdnWindowUpdate += tempBuff;
-		msisdnWindowUpdate += " WHERE iCampaignId=";
+		msisdnWindowUpdate += ",dtSubmitDatetime=NOW() WHERE iCampaignId=";
 		memset(tempBuff, 0x00, sizeof(tempBuff));
 		sprintf(tempBuff, "%d", campaignId);
 		msisdnWindowUpdate += tempBuff;
@@ -130,6 +158,7 @@ void * CampaignThread(void *arg){
 			campaign_error_cnt = 0; // reset Counter As Able to connect to Mysql
 		}else{
 			APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Problem in Excuting Query : %s ", msisdnPickingQuery.c_str());
+			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "MYSQLERROR: %d:%s ", errNo, errMsg);
 			// Set ERROR Message/state
 			//break;
 			// 1.TODO Below are workarround for Mysql Dropped Connection issue
@@ -143,12 +172,14 @@ void * CampaignThread(void *arg){
 		}
 		MYSQL_ROW tempRow=NULL;
 		sms_data_t tempSmsData;
+		l_esmeItr = l_esmeInstanceList.begin();
 		tempRow = mysql_fetch_row(sqlobj.m_pRecordsetPtr);
 		while(tempRow){
 			// Prepare sms data
 			memset(&tempSmsData, 0x00, sizeof(tempSmsData));
 			tempSmsData.id = atoi(tempRow[0]);
 			tempSmsData.status= SMS_ST_PICKED;
+			strncpy((char *)tempSmsData.table, l_tableName, 15);
 			if(tempRow[1]){
 				strncpy((char *)tempSmsData.party_a, tempRow[1], 15);
 			}
@@ -161,13 +192,25 @@ void * CampaignThread(void *arg){
 			if(tempRow[4]){
 				tempSmsData.type = atoi(tempRow[4]);
 			}
-			myEsme.SendSms(tempSmsData);
+			//myEsme.SendSms(tempSmsData);
+			if(*l_esmeItr){
+				while(((*l_esmeItr)->NoOfSmsInQueue() > SMS_CAMPAIGN_QUEUE_SIZE) || (!(*l_esmeItr)->IsSendSms())){
+					APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "PAUSE QUEUEING OF SMS FOR %u MICROSEC TO HANDLE ERRORS %s : %d", SMS_CAMPAIGN_ENQUEUE_USLEEP, (*l_esmeItr)->GetEsmeName().c_str(), (*l_esmeItr)->GetEsmeState());
+					usleep(SMS_CAMPAIGN_ENQUEUE_USLEEP);
+				}
+				(*l_esmeItr)->SendSms(tempSmsData);
+			}
+			l_esmeItr++;
+			if(l_esmeItr == l_esmeInstanceList.end()){
+				l_esmeItr = l_esmeInstanceList.begin();
+			}
 			// Update Query Nos
 			submittedMsisdn += tempRow[0];
 			submittedMsisdn += ",";
 			tempRow = mysql_fetch_row(sqlobj.m_pRecordsetPtr);
 		}
-		mysql_free_result(sqlobj.m_pRecordsetPtr);
+		if(sqlobj.m_pRecordsetPtr)
+			mysql_free_result(sqlobj.m_pRecordsetPtr);
 		if(submittedMsisdn.length()){
 			submittedMsisdn.pop_back();
 			msisdnWindowUpdate += submittedMsisdn;
@@ -182,6 +225,7 @@ void * CampaignThread(void *arg){
 				campaign_error_cnt = 0 ; // reset counter 
 			}else{
 				APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "Problem in Excuting Query: %s :: %d :: %s", msisdnWindowUpdate.c_str(), errNo, errMsg);
+				APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "MYSQLERROR: %d:%s ", errNo, errMsg);
 				// Set ERROR Message/status
 				//break;
 				campaign_error_cnt ++;
@@ -194,7 +238,7 @@ void * CampaignThread(void *arg){
 			// No Further Record
 			break;
 		}
-		sleep(1);//usleep(); // Window Sleep
+		usleep(CAMPAIGN_WINDOW_USLEEP);//usleep(); // Window Sleep
 	}
 	// Once Done Campaign Update Campaign As Completed
 	//use same campaignUpdateQuery Variable
@@ -210,9 +254,9 @@ void * CampaignThread(void *arg){
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Query Executed\n" );
 	}else{
 		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "Problem in Excuting Query: %s", campaignStatusUpdateQuery.c_str());
-		G_CampaignThStatus = TH_ST_STOP ;
+		l_campaignItr->second.thStatus = TH_ST_STOP ;
 		return NULL;
 	}
-	G_CampaignThStatus = TH_ST_STOP ;
+	l_campaignItr->second.thStatus = TH_ST_STOP ;
 	return NULL;
 }

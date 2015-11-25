@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MyEsme>
+        <logger>
+                <path>/var/log/myesme</path>
+                <name>myesme</name>
+                <tag>ESMEPoTx</tag>
+                <level>8</level>
+                <interval>3600</interval>
+        </logger>
+        <mysql>
+                <ip>127.0.0.1</ip>
+                <port>3306</port>
+                <user>root</user>
+                <password>mysqlpass</password>
+                <name>smstest</name>
+        </mysql>
+	<messagequeue>
+                <updateqryque_name>/updqryqueu</updateqryque_name>
+                <updateqryque_msg_size>256</updateqryque_msg_size>
+                <updateqryque_no_of_msg>100000</updateqryque_no_of_msg>
+        </messagequeue>
+</MyEsme>
+

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MyEsme>
+        <logger>
+                <path>/var/log/myesme</path>
+                <name>myesme</name>
+                <tag>ESMEPoTx</tag>
+                <level>8</level>
+                <interval>3600</interval>
+        </logger>
+        <mysql>
+                <ip>127.0.0.1</ip>
+                <port>3306</port>
+                <user>root</user>
+                <password>mysqlpass</password>
+                <name>smstest</name>
+        </mysql>
+	<messagequeue>
+                <updateqryque_name>/updqryqueu</updateqryque_name>
+                <updateqryque_msg_size>256</updateqryque_msg_size>
+                <updateqryque_no_of_msg>100000</updateqryque_no_of_msg>
+        </messagequeue>
+	<smscampaign>
+                <campaigntype>0,1,5,7</campaigntype>
+		<maxcampaign>10</maxcampaign>
+	</smscampaign>
+	<smppconnection>
+		<noofconnection>4</noofconnection>
+	</smppconnection>
+	<smppcon1> 
+		<name>smpplocaltx1</name>
+		<cfgfile>/usr/etc/smpplocaltx.xml</cfgfile>
+	</smppcon1>
+	<smppcon2> 
+		<name>smpplocalrx1</name>
+		<cfgfile>/usr/etc/smpplocalrx.xml</cfgfile>
+	</smppcon2>
+	<smppcon3> 
+		<name>smpplocaltx2</name>
+		<cfgfile>/usr/etc/smpplocaltx.xml</cfgfile>
+	</smppcon3>
+	<smppcon4> 
+		<name>smpplocalrx2</name>
+		<cfgfile>/usr/etc/smpplocalrx.xml</cfgfile>
+	</smppcon4>
+
+</MyEsme>
+

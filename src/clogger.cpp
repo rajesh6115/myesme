@@ -192,6 +192,8 @@ int logger_log_header(logger_p log, unsigned int log_level, const char *srcname,
 {
 	int ret_val = 0;
 	struct tm cur_time;
+	struct tm cur_ftime;
+        struct tm create_ftime;
 	time_t temp_time;
 	char logtag[64]={0x00};
 	if(log == NULL)
@@ -215,6 +217,12 @@ int logger_log_header(logger_p log, unsigned int log_level, const char *srcname,
 	{
 		logger_open(log);
 	}
+	// for Sysnc For Hour Wise
+        localtime_r(&temp_time, &cur_ftime);
+        localtime_r(&log->create_time, &create_ftime);
+        if((cur_ftime.tm_min == 0) and (cur_ftime.tm_hour != create_ftime.tm_hour)){
+                logger_open(log);
+        }
 	/////prepare tag//////////
 	//time(&temp_time);
 	temp_time = time(NULL);

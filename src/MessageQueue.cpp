@@ -73,6 +73,9 @@ uint32_t SysMessageQueue::MaximumSizePermessage(void){
 }
 
 uint32_t SysMessageQueue::Open(const char *name, uint32_t size_per_msg, uint32_t no_of_msg, int operation){
+	if(mesi_mqState == MQ_ST_OPENED){
+		return MQ_ERR_SUCESS;
+	}
 	if ( !IsQueueExist(name)){
 		// Message Queue Not Exist So Try To Create It
 		if( MQ_ERR_SUCESS != Create( name, size_per_msg, no_of_msg) ){
@@ -93,6 +96,7 @@ uint32_t SysMessageQueue::Close(void){
 	if (me_mqid != (mqd_t) -1){
 		mq_close(me_mqid);
 	}
+	mesi_mqState = MQ_ST_CLOSED;
 	return MQ_ERR_SUCESS;
 }
 
@@ -119,6 +123,7 @@ bool SysMessageQueue::IsQueueExist(const char *name){
 uint32_t SysMessageQueue::Delete(const char *name){
 	int ret = mq_unlink(name);
 	if (ret = 0){
+		mesi_mqState = MQ_ST_DELETED;
 		return MQ_ERR_SUCESS;
 	}else{
 	//TODO Set Proper Error Message
