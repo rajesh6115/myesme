@@ -561,6 +561,7 @@ void *Esme::LinkCheckThread(void *arg){
 						{
 							APP_LOGGER(CG_MyAppLogger, LOG_WARNING," Bind Requested %s", l_esmeInstanceItr->second->GetEsmeName().c_str());
 						}
+						break;
 					case Esme::ST_BIND: // 3
 						{
 							l_esmeInstanceItr->second->SendEnquireLink();
@@ -580,13 +581,15 @@ void *Esme::LinkCheckThread(void *arg){
 						break;
 					case Esme::ST_NOTCONNECTED:
 						{
+							APP_LOGGER(CG_MyAppLogger, LOG_ERROR," Trying To Connect Socket %s", l_esmeInstanceItr->second->GetEsmeName().c_str());
 							if(l_esmeInstanceItr->second->OpenConnection() == -1){
-								sleep(30); // Give Some Time To Server
+								sleep(10); // Give Some Time To Server
 							}
 						}
+						break;
 					default:
 						APP_LOGGER(CG_MyAppLogger, LOG_ERROR," SHOULD NOT BE IN STATE %s: %d", l_esmeInstanceItr->second->GetEsmeName().c_str(), l_esmeInstanceItr->second->GetEsmeState());
-						sleep(30);
+						sleep(10);
 					break;
 				}
 			}
@@ -676,7 +679,6 @@ void *Esme::ThSmsReader(void *arg){
 							if(l_esmeInstanceItr->second->Read(tempSmppPdu) != 0){
 								// 1. Log Error
 								APP_LOGGER(CG_MyAppLogger, LOG_DEBUG,"Error In Reading PDU ");
-								;
 							}
 						}
 					}
@@ -819,12 +821,12 @@ int Esme::DoDatabaseUpdate(NetBuffer &tmpNetBuf){
 							m_vcMsgIdMap.erase(l_msgIdItr);
 							m_vcMsgIdMapLock.unlock();
 						}else{
-								m_vcMsgIdSyncMap.insert(std::pair<std::string, uint8_t>(l_msgId, sms_state));
+							m_vcMsgIdSyncMap.insert(std::pair<std::string, uint8_t>(l_msgId, sms_state));
 							APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "SMS DATA NOT AVAILABLE FOR %s:%u", l_msgId, sms_state);
 							if(sms_state){
-								sprintf(tmpBuffer, " UPDATE SMSMT_ERROR SET iStatus=%u,dtDeliveryDatetime='%s' Where vcMsgId='%s' ORDER BY iSNo DESC LIMIT 1" , sms_state, currentTime.c_str(), l_msgId);
+								sprintf(tmpBuffer, " INSERT INTO SMSMT_ERROR (iStatus, dtDeliveryDatetime, vcMsgId) VALUES (%u,'%s','%s')" , sms_state, currentTime.c_str(), l_msgId);
 							}else{
-								sprintf(tmpBuffer, " UPDATE SMSMT_ERROR SET iStatus=%u,dtDeliveryDatetime='%s' Where vcMsgId='%s' ORDER BY iSNo DESC LIMIT 1" , SMS_ST_FAILED, currentTime.c_str(), l_msgId);
+								sprintf(tmpBuffer, " INSERT INTO SMSMT_ERROR (iStatus, dtDeliveryDatetime, vcMsgId) VALUES (%u,'%s','%s')" , SMS_ST_FAILED, currentTime.c_str(), l_msgId);
 							}
 						}
 						myUpdateQuery = tmpBuffer;

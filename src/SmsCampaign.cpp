@@ -193,12 +193,23 @@ void * CampaignThread(void *arg){
 				tempSmsData.type = atoi(tempRow[4]);
 			}
 			//myEsme.SendSms(tempSmsData);
-			if(*l_esmeItr){
-				while(((*l_esmeItr)->NoOfSmsInQueue() > SMS_CAMPAIGN_QUEUE_SIZE) || (!(*l_esmeItr)->IsSendSms())){
+			unsigned long l_campaign_usleep=SMS_CAMPAIGN_ENQUEUE_USLEEP;
+			while(*l_esmeItr){
+				if(((*l_esmeItr)->NoOfSmsInQueue() > SMS_CAMPAIGN_QUEUE_SIZE) || (!(*l_esmeItr)->IsSendSms())){
 					APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "PAUSE QUEUEING OF SMS FOR %u MICROSEC TO HANDLE ERRORS %s : %d", SMS_CAMPAIGN_ENQUEUE_USLEEP, (*l_esmeItr)->GetEsmeName().c_str(), (*l_esmeItr)->GetEsmeState());
-					usleep(SMS_CAMPAIGN_ENQUEUE_USLEEP);
+					usleep(l_campaign_usleep);
+					l_campaign_usleep += 200000;
+					if(l_campaign_usleep == 1000000){
+						l_campaign_usleep = SMS_CAMPAIGN_ENQUEUE_USLEEP;
+					}
+					l_esmeItr++;
+					if(l_esmeItr == l_esmeInstanceList.end()){
+						l_esmeItr = l_esmeInstanceList.begin();
+					}
+				}else{
+					(*l_esmeItr)->SendSms(tempSmsData);
+					break;
 				}
-				(*l_esmeItr)->SendSms(tempSmsData);
 			}
 			l_esmeItr++;
 			if(l_esmeItr == l_esmeInstanceList.end()){

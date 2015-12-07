@@ -19,6 +19,9 @@ void Esme::SendOneSms(void){
 		}
 	}else{
 		APP_LOGGER(CG_MyAppLogger, LOG_WARNING, " PAUSE OF SENDING: %s : %u ", this->GetEsmeName().c_str(), this->GetEsmeState());
+		if(this->GetEsmeState() == ST_ERROR){
+			usleep(10000); // delay by 10ms
+		}
 		g_threadPool.enqueue(&Esme::SendOneSms, this); // Enque missed event
 	}
 }
