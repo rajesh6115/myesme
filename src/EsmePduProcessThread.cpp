@@ -159,7 +159,7 @@ void Esme::OnReceivePdu(void){
 							sms_data_t tmpSms = this->sendSmsMap[seqNum];
 							this->UnRegisterSmsData(seqNum);
 							//usleep(RESEND_USLEEP); // Put Some Sleep To Give Server Little Time
-							this->SendSubmitSm(seqNum, tmpSms.party_a, tmpSms.party_b, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
+							this->SendSubmitSm(seqNum, tmpSms.party_a, (Smpp::Uint8)tmpSms.src_ton, (Smpp::Uint8)tmpSms.src_npi, tmpSms.party_b, (Smpp::Uint8)tmpSms.dest_ton, (Smpp::Uint8)tmpSms.dest_npi, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
 							//this->SendSms(tmpSms);
 						}else{
 							this->m_isSendSms = true;

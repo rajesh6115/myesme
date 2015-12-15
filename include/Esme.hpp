@@ -1,5 +1,8 @@
 #ifndef _ESME_H_
 #define _ESME_H_
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <iostream>
 #include <cstring>
 #include <map>
@@ -24,8 +27,10 @@
 #ifdef _MESSAGE_QUEUE_UPDATE_
 #include <MessageQueue.hpp>
 #endif
-
 #include <mutex>
+#ifdef WITH_LIBEVENT
+#include <event.h>
+#endif
 class Esme{
 	public:
 		typedef enum ESME_STATE{
@@ -51,7 +56,16 @@ class Esme{
 		std::string m_esmeid; // Readable Name For Esme Instance
 		std::string m_host;
 		uint16_t m_port;
+#ifdef WITH_LIBEVENT
+		struct event_base *m_base;
+		struct bufferevent *m_bufferEvent;
+#else
 		int m_esmeSocket;
+		// Regulated Instance Creation
+		// Variable Need To Make Multi socket Reading
+		static fd_set m_readfdset;
+		static int m_max_fd;
+#endif
 		struct sockaddr_in m_smscInfo;
 		esme_state_t m_esmeState;
 		bind_type_t m_esmeType;
@@ -87,7 +101,7 @@ class Esme{
 		int UnRegisterPdu(NetBuffer &tmpNetBuf);	
 		// Will Send A Enquiry Link to Check SMPP Session Is Live
 		int SendEnquireLink(void);
-				////		class scope   /////
+		////		class scope   /////
 		// Sequence Number
 		// Mutex Lock Required for Sequence Number Generation
 		static Smpp::Uint32 m_esmePduSequenceNum;
@@ -130,7 +144,7 @@ class Esme{
 		static void *ThSmsSender(void *);
 		static pthread_t sendThId;
 		static thread_status_t sendThStatus;
-	
+
 		// OnReceivePduThread -> Responsible for Processing SMS Packet 
 		// TODO:
 		// 1. This Thread Is Responsible For Processing One SMPP Frame At atime
@@ -140,10 +154,6 @@ class Esme{
 		static thread_status_t pduProcessThStatus;
 		static void *ThOnReceivePdu(void *);
 #endif	
-		// Regulated Instance Creation
-		// Variable Need To Make Multi socket Reading
-		static fd_set m_readfdset;
-		static int m_max_fd;
 		// One Map For Instance of This Class
 		static std::map<std::string, Esme *> esmeInstanceMap;
 		static uint32_t maxEsmeInstance;
@@ -156,6 +166,9 @@ class Esme{
 		uint32_t m_sizePerMsgInUpdateQueryMsgQueue;
 #endif
 		~Esme(void);
+#ifdef WITH_LIBEVENT
+		Esme(std::string name, std::string cfgFile, struct event_base *base);
+#endif
 		Esme(std::string name, std::string cfgFile);
 		Esme(const Esme&)=delete;
 		Esme &operator=(const Esme&)=delete;
@@ -171,12 +184,19 @@ class Esme{
 		int Write(NetBuffer &); // Just Write all Bytes
 		int Read(NetBuffer &); // Frammer will be implemented here 
 		int Bind(Smpp::SystemId sysId, Smpp::Password pass, Smpp::SystemType sysType, Smpp::InterfaceVersion ifVer, Smpp::Ton ton, Smpp::Npi npi, Smpp::AddressRange range, bind_type_t bindType);
-		int SendSubmitSm(uint32_t pduSeq, const Smpp::Char *srcAddr, const Smpp::Char *destAddr, uint8_t type, const Smpp::Uint8 *sms, Smpp::Uint32 length);
+		int SendSubmitSm(uint32_t seqNo, const Smpp::Char *srcAddr, Smpp::Uint8 srcTon, Smpp::Uint8 srcNpi, const Smpp::Char *destAddr, Smpp::Uint8 destTon, Smpp::Uint8 destNpi, uint8_t type, const Smpp::Uint8 *sms, Smpp::Uint32 length);
 		int UnBind(void);
+// If libevent is There There is no need of Separate Reader Thread
+#ifdef WITH_LIBEVENT
+		static void EventCallBack(bufferevent*, short int, void*);
+		static void ReadCallBack(bufferevent*, void*);
+#else
 		// Reader Having Class Scope
 		static int StartReader(void);
 		static int StopReader(void);
 		static thread_status_t GetRcvThStatus(void);
+#endif
+
 #ifndef WITH_THREAD_POOL
 		// One Sender Per Class Is Enough
 		static int StartSender(void);
@@ -187,27 +207,38 @@ class Esme{
 		static int StopPduProcess(void);
 		static thread_status_t GetPduProcessThStatus(void);
 #endif
+
+// From Lib Event Once Timer will be Implemented 
+// we can elemenate Linkcheck thread
+// TODO: Introduce Libevent Timer For Linkcheck Thread
+// new signature required start and stop linkcheck timer
+// on linkcheck time out has to design
 		// Can Be Managed In Single Thread
 		static int StartLinkCheck(void);
 		static int StopLinkCheck(void);
 		static thread_status_t GetEnquireLinkThStatus(void);
-		
+
 		int Start(void);
 		int Stop(void);
 		std::string GetEsmeName(void);
+#ifndef WITH_LIBEVENT
 		int GetEsmeSocket(void);
+#endif
 		uint32_t GetEsmeTps(void);
 		account_type_t GetEsmeAccountType(void);
 		bool IsSendSms(void);
 		uint32_t NoOfSmsInQueue(void);
 		int SendSms(sms_data_t sms);
 		bind_type_t GetEsmeType(void);
-			// class Scope//
+		// class Scope//
 		//1. Controlled and Named Object
-		static Esme * GetEsmeInstance(std::string name, std::string cfgFile);
 		static void RemoveEsmeInstance(std::string name);
 		static uint32_t GetNumberOfEsmeInstance(bind_type_t type);
-		
+#ifdef WITH_LIBEVENT
+		static Esme * GetEsmeInstance(std::string name, std::string cfgFile, struct event_base *base);
+#else
+		static Esme * GetEsmeInstance(std::string name, std::string cfgFile);
+#endif
 };
 #endif
 

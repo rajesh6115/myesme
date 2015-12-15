@@ -27,6 +27,35 @@ Smpp::Uint32 Esme::m_esmePduSequenceNum = Smpp::SequenceNumber::Min;
 std::map<std::string, Esme *> Esme::esmeInstanceMap;
 uint32_t Esme::maxEsmeInstance = ESME_MAX_NO_OF_INSTANCE;
 
+#ifdef WITH_LIBEVENT
+Esme * Esme::GetEsmeInstance(std::string name, std::string cfgFile, struct event_base *base){
+	if(esmeInstanceMap.size() >= maxEsmeInstance && name.empty()){
+                // 1. Set Error And Fill Error Buffer
+                //std::cerr << "Either Name is Empty OR Reached Instance Limit" << std::endl;
+                return NULL;
+        }
+        Esme *tmpObj = NULL;
+        std::map<std::string, Esme *>::iterator instanceItr;
+        instanceItr = esmeInstanceMap.find(name);
+        if(instanceItr == esmeInstanceMap.end() ){
+                tmpObj = new Esme(name, cfgFile, base);
+                if(tmpObj){
+                        // 1. Log Here For Creation Of Instance
+                        //std::cout << "Instance Created with Id " << name << std::endl;
+                        esmeInstanceMap.insert(std::pair<std::string, Esme *>(name, tmpObj));
+                }else{
+                        // 1. Log Error For Failing Creation Of Instance
+                        //std::cerr << " Short In Memory" << std::endl;
+                        ;
+                }
+        }else{
+                // 1. Log Returning Of Existing Object
+                //std::cout << "Returning Same Object" << std::endl;
+                tmpObj = instanceItr->second;
+        }
+        return tmpObj;
+}
+#else
 Esme * Esme::GetEsmeInstance(std::string name, std::string cfgFile){
 	if(esmeInstanceMap.size() >= maxEsmeInstance && name.empty()){
 		// 1. Set Error And Fill Error Buffer
@@ -54,6 +83,7 @@ Esme * Esme::GetEsmeInstance(std::string name, std::string cfgFile){
 	}
 	return tmpObj;
 }
+#endif
 
 void Esme::RemoveEsmeInstance(std::string name){
 	if( !esmeInstanceMap.empty()){
@@ -87,9 +117,11 @@ std::string Esme::GetEsmeName(void){
 	return m_esmeid;
 }
 
+#ifndef WITH_LIBEVENT
 int Esme::GetEsmeSocket(void){
 	return m_esmeSocket;
 }
+#endif
 
 Esme::~Esme(void){
 	CloseConnection();
@@ -100,16 +132,27 @@ Esme::~Esme(void){
 #ifdef _MESSAGE_QUEUE_UPDATE_
 	m_updateQueryMsgQueue.Close();
 #endif
-
 }
 
+#ifdef WITH_LIBEVENT
+Esme::Esme(std::string name, std::string cfgFile, struct event_base *base):Esme(name, cfgFile){
+	if(base != NULL){
+		m_base = base;
+	}
+	//Esme(name, cfgFile);
+}
+#endif
 
 Esme::Esme(std::string name, std::string cfgFile){
 	this->m_esmeid = name;
 	this->m_cfgFile = cfgFile;
 	this->m_host = DFL_SMPP_URL;
 	this->m_port = DFL_SMPP_PORT;
+#ifdef WITH_LIBEVENT
+	m_bufferEvent = NULL;
+#else
 	m_esmeSocket = -1;
+#endif
 	bzero(&m_smscInfo, sizeof(struct sockaddr_in));
 	m_esmeState = Esme::ST_IDLE;
 	m_esmeType = BIND_RDONLY;
@@ -129,6 +172,20 @@ Esme::Esme(std::string name, std::string cfgFile){
 	this->m_updateQueryMsgQueueName	= m_smppCfg.GetUpdateQueryQueueName();
 	this->m_sizePerMsgInUpdateQueryMsgQueue = m_smppCfg.GetUpdateQueryQueueMsgSize();
 	this->m_noOfMsgsInUpdateQueryMsgQueue = m_smppCfg.GetUpdateQueryQueueNoOfMsg();
+		// 1. Load Data From Config File
+	this->m_host = m_smppCfg.GetSmscIp();
+	this->m_port = m_smppCfg.GetSmscPort();
+	this->m_esmeType = m_smppCfg.GetSmscType();
+	this->m_esmeTps = m_smppCfg.GetSmscTps();
+
+	this->m_sysId = m_smppCfg.GetSystemId();
+	this->m_sysPass = m_smppCfg.GetPassword();
+	this->m_sysType = m_smppCfg.GetSystemType();
+	this->m_IfVersion = m_smppCfg.GetInterfaceVersion();
+	this->m_esmeTon = m_smppCfg.GetTon();
+	this->m_esmeNpi = m_smppCfg.GetNpi();
+	this->m_addrRange = m_smppCfg.GetAddressRange();
+	this->m_isSendSms = true;
 #ifdef _MYSQL_UPDATE_
 	// TODO:
 	// 1. Global Config Should Not Be Used Inside Esme Class
@@ -168,7 +225,37 @@ Smpp::Uint32 Esme::GetNewSequenceNumber(void){
 	return tmp;
 }
 
+#ifdef WITH_LIBEVENT
+void Esme::EventCallBack(struct bufferevent *bev, short events, void *arg){
+	Esme *objp = (Esme*)arg;
+        if(events & BEV_EVENT_CONNECTED){
+		APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connected To HOST=%s PORT=%u ", objp->m_host.c_str(), objp->m_port );
+		objp->m_esmeState = ST_CONNECTED;
+        }else if(events & BEV_EVENT_ERROR){
+                //printf("Error in Connection : %s\n",((AsyncTcpSocket *) arg)->m_name.c_str());
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "NOT ABLE to Connect HOST=%s PORT=%u ", objp->m_host.c_str(), objp->m_port );
+		objp->m_esmeState = ST_NOTCONNECTED;
+        }
+}
+#endif
+
 int Esme::OpenConnection(void){
+#ifdef WITH_LIBEVENT
+        if(m_bufferEvent == NULL){
+		m_bufferEvent = bufferevent_socket_new(m_base, -1, BEV_OPT_CLOSE_ON_FREE);
+        }
+	memset(&m_smscInfo, 0x00, sizeof(m_smscInfo));
+        m_smscInfo.sin_family = PF_INET;
+        m_smscInfo.sin_addr.s_addr = inet_addr(this->m_host.c_str());
+        m_smscInfo.sin_port = htons(this->m_port);
+	APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connecting to HOST=%s PORT=%u ", m_host.c_str(), m_port );
+        bufferevent_setcb(m_bufferEvent, &Esme::ReadCallBack, NULL, &Esme::EventCallBack, this );
+        bufferevent_enable(m_bufferEvent, EV_READ|EV_WRITE);
+	if(bufferevent_socket_connect(m_bufferEvent, (struct sockaddr *)&m_smscInfo, sizeof(m_smscInfo)) < 0){
+                bufferevent_free(m_bufferEvent);
+                return -1;
+        }
+#else
 	if(m_esmeSocket == -1){
 		m_esmeSocket = socket(PF_INET, SOCK_STREAM, 0);
 		if(m_esmeSocket == -1){
@@ -187,6 +274,7 @@ int Esme::OpenConnection(void){
 		APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connected To HOST=%s PORT=%u ", m_host.c_str(), m_port );
 		m_esmeState = ST_CONNECTED;
 	}
+#endif
 	return 0;
 }
 
@@ -194,10 +282,20 @@ int Esme::OpenConnection(std::string host, uint32_t portno){
 	// Decide on Some Condition
 	this->m_host = host;
 	this->m_port = portno;
+	APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connecting to HOST=%s PORT=%u ", m_host.c_str(), m_port );
 	return OpenConnection();
 }
 
 int Esme::CloseConnection(void){
+#ifdef WITH_LIBEVENT
+	if (m_esmeState == ST_IDLE || m_esmeState == ST_NOTCONNECTED){
+		return 0;
+	}
+        if(m_bufferEvent != NULL){
+		bufferevent_free(m_bufferEvent);
+	}
+	m_bufferEvent=NULL;
+#else
 	if (m_esmeState == ST_IDLE || this->m_esmeSocket == -1 || m_esmeState == ST_NOTCONNECTED){
 		return 0; // Already disconnected
 	}
@@ -206,6 +304,7 @@ int Esme::CloseConnection(void){
 	}
 	close(m_esmeSocket);
 	m_esmeSocket = -1;
+#endif
 	m_esmeState = ST_IDLE ;
 
 	return 0;
@@ -246,6 +345,21 @@ int Esme::UnRegisterPdu(NetBuffer &tmpNetBuf){
 	}
 }
 
+#ifdef WITH_LIBEVENT
+int Esme::Write(NetBuffer &robj){
+        uint32_t writtenBytes;
+        writtenBytes = evbuffer_add(bufferevent_get_output(m_bufferEvent), robj.GetBuffer(), robj.GetLength());
+        if(writtenBytes == -1){
+                APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN Writing To SMSC PLEASE RECONNECT" );
+                m_esmeState = Esme::ST_ERROR;
+                return -1;
+        }else{
+        	return robj.GetLength();
+	}
+}
+#endif
+
+#ifndef WITH_LIBEVENT
 int Esme::Write(NetBuffer &robj){
 	uint32_t writtenBytes;
 	writtenBytes = write(this->m_esmeSocket, robj.GetBuffer(), robj.GetLength());
@@ -257,7 +371,37 @@ int Esme::Write(NetBuffer &robj){
 	return writtenBytes;
 }
 
+#endif
 
+#ifdef WITH_LIBEVENT
+void Esme::ReadCallBack(struct bufferevent *bev, void *ptr){
+	int32_t readBytes;
+	uint8_t readBuffer[MAX_READ_BUFFER_LENGTH];
+	memset(readBuffer, 0x00, sizeof(readBuffer));
+        struct evbuffer *input = bufferevent_get_input(bev);
+        while ((readBytes = evbuffer_remove(input, readBuffer, sizeof(readBuffer))) > 0) {
+                ((Esme *)ptr)->m_readNetBuffer.Append(readBuffer, readBytes);
+        }
+	NetBuffer tempBuf;	
+	uint32_t requireBytes = Smpp::get_command_length((const Smpp::Uint8*)((Esme *)ptr)->m_readNetBuffer.GetBuffer());
+        while( (requireBytes>0) && (requireBytes <= ((Esme *)ptr)->m_readNetBuffer.GetLength()) ){
+                tempBuf.Erase();
+                tempBuf.Append(((Esme *)ptr)->m_readNetBuffer.GetBuffer(), requireBytes);
+                ((Esme *)ptr)->m_readNetBuffer.Erase(0, requireBytes);
+                ((Esme *)ptr)->receiveQueue.push(tempBuf);
+#ifdef  WITH_THREAD_POOL
+                g_threadPool.enqueue(&Esme::OnReceivePdu, ((Esme *)ptr));
+#endif
+                if(((Esme *)ptr)->m_readNetBuffer.GetLength()){
+                requireBytes = Smpp::get_command_length((const Smpp::Uint8*)((Esme *)ptr)->m_readNetBuffer.GetBuffer());
+                }else{
+                        requireBytes = 0;
+                }
+        }
+}
+#endif
+
+#ifndef WITH_LIBEVENT
 int Esme::Read(NetBuffer &robj){
 	int32_t readBytes;
 	uint8_t readBuffer[MAX_READ_BUFFER_LENGTH];
@@ -294,6 +438,7 @@ int Esme::Read(NetBuffer &robj){
 	}
 	return 0;
 }
+#endif
 
 int Esme::Bind(void){
 	if(m_esmeState == ST_BIND){
@@ -393,21 +538,21 @@ int Esme::UnBind(void){
 // 3. Default Esme Ton Npi Should be Available as Esme Class data member
 // 4. Wheather Delivery Report Should Available Should be Taken From EMSE class data member
 // 5. Should Support gsm 7bit coding and language shift tables of gsm character set
-int Esme::SendSubmitSm(uint32_t seqNo, const Smpp::Char *srcAddr, const Smpp::Char *destAddr, uint8_t type, const Smpp::Uint8 *sms, Smpp::Uint32 length){
+int Esme::SendSubmitSm(uint32_t seqNo, const Smpp::Char *srcAddr, Smpp::Uint8 srcTon, Smpp::Uint8 srcNpi, const Smpp::Char *destAddr, Smpp::Uint8 destTon, Smpp::Uint8 destNpi, uint8_t type, const Smpp::Uint8 *sms, Smpp::Uint32 length){
 	if(m_esmeState != ST_BIND){
 		return -1;
 	}
 	NetBuffer nwData;
 	Smpp::SubmitSm pdu;
 	pdu.sequence_number(seqNo);
-	Smpp::Ton srcTon(Smpp::Ton::National);
-	Smpp::Npi srcNpi(Smpp::Npi::National);
+	Smpp::Ton l_srcTon(srcTon);
+	Smpp::Npi l_srcNpi(srcNpi);
 	Smpp::Address sAddr(srcAddr);
-	Smpp::SmeAddress srcAddress(srcTon, srcNpi, sAddr);
-	Smpp::Ton destTon(Smpp::Ton::National);
-	Smpp::Npi destNpi(Smpp::Npi::National);
+	Smpp::SmeAddress srcAddress(l_srcTon, l_srcNpi, sAddr);
+	Smpp::Ton l_destTon(destTon);
+	Smpp::Npi l_destNpi(destNpi);
 	Smpp::Address dAddr(destAddr);
-	Smpp::SmeAddress destAddress(destTon, destNpi, dAddr);
+	Smpp::SmeAddress destAddress(l_destTon, l_destNpi, dAddr);
 	pdu.source_addr(srcAddress);
 	pdu.destination_addr(destAddress);
 
@@ -553,7 +698,7 @@ void *Esme::LinkCheckThread(void *arg){
 					case Esme::ST_IDLE: // 0
 						{
 							if(l_esmeInstanceItr->second->Start() == -1){
-								APP_LOGGER(CG_MyAppLogger, LOG_ERROR,"Failed To Re Start Connection %s", l_esmeInstanceItr->second->GetEsmeName().c_str());
+								APP_LOGGER(CG_MyAppLogger, LOG_ERROR,"Failed To Start Connection %s", l_esmeInstanceItr->second->GetEsmeName().c_str());
 							}
 						}
 						break;
@@ -601,7 +746,7 @@ void *Esme::LinkCheckThread(void *arg){
 	return NULL;
 }
 
-
+#ifndef WITH_LIBEVENT
 
 int Esme::StartReader(void){
 	rcvThStatus = TH_ST_REQ_RUN;
@@ -691,6 +836,7 @@ void *Esme::ThSmsReader(void *arg){
 	return NULL;
 }
 
+#endif
 
 int Esme::SendSms(sms_data_t sms){
 	// Make thread safe pending
@@ -908,20 +1054,6 @@ int Esme::UnRegisterSmsData(uint32_t pduSeq){
 // 2. Use/Put Necessary Infos Regarding SMPP Connection to Datamember Of Class
 // 3. Please Remove Global App config
 int Esme::Start(void){
-	// 1. Load Data From Config File
-	this->m_host = m_smppCfg.GetSmscIp();
-	this->m_port = m_smppCfg.GetSmscPort();
-	this->m_esmeType = m_smppCfg.GetSmscType();
-	this->m_esmeTps = m_smppCfg.GetSmscTps();
-
-	this->m_sysId = m_smppCfg.GetSystemId();
-	this->m_sysPass = m_smppCfg.GetPassword();
-	this->m_sysType = m_smppCfg.GetSystemType();
-	this->m_IfVersion = m_smppCfg.GetInterfaceVersion();
-	this->m_esmeTon = m_smppCfg.GetTon();
-	this->m_esmeNpi = m_smppCfg.GetNpi();
-	this->m_addrRange = m_smppCfg.GetAddressRange();
-	this->m_isSendSms = true;
 	//this->m_registerDeliveryReport = ;
 	//2. Open Connection
 	if(OpenConnection() != 0){

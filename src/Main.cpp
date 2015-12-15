@@ -7,7 +7,7 @@
 
 progschj::ThreadPool g_threadPool;
 #endif
-
+#include <event2/thread.h>
 int IS_PROCESS_RUN=0;
 
 void int_signal(int num){
@@ -39,20 +39,40 @@ int main(int argc, char *argv[]){
 
         APP_LOGGER(CG_MyAppLogger, LOG_DEFAULT, "Compiled On %s %s", __DATE__, __TIME__);
         APP_LOGGER(CG_MyAppLogger, LOG_DEFAULT, "Report Bugs to %s",PACKAGE_BUGREPORT);
+#ifdef WITH_LIBEVENT
+	evthread_use_pthreads();
+	struct event_base *base = NULL;
+        base = event_base_new();
+        if(base == NULL){
+		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "NOT ABLE TO GET EVENT BASE");
+                return -1;
+        }
+#else
 	Esme::StartReader();
+#endif
+
 #ifndef WITH_THREAD_POOL
 	Esme::StartPduProcess();
 	Esme::StartSender();
 #endif
+
 	Esme::StartLinkCheck();
 	Esme *tmpSmppConn = NULL;
+	sleep(1);
 	for(int i=0; i< CG_MyAppConfig.GetMaxinumSmppConnection(); i++){
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Connection NAME: %s : Config File %s", CG_MyAppConfig.GetSmppConnectionName(i).c_str(), CG_MyAppConfig.GetSmppConnectionConfigFile(i).c_str() ); 
+#ifdef WITH_LIBEVENT
+		tmpSmppConn = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i), base);
+#else
 		tmpSmppConn = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i));
+#endif
 	}
-	sleep(1);
 	IS_PROCESS_RUN = 1;
-	sleep(1);
+	while(IS_PROCESS_RUN){
+	event_base_dispatch(base);
+	}
+	event_base_free(base);
+	return 0;
 	std::map<uint32_t, campaign_info_t>::iterator l_campaignItr;
 	while(IS_PROCESS_RUN){
 		if(campaignId = IsActiveCampaign()){
@@ -98,12 +118,19 @@ int main(int argc, char *argv[]){
 	Esme::StopSender();
 #endif
 	for(int i=0; i< CG_MyAppConfig.GetMaxinumSmppConnection(); i++){
+#ifdef WITH_LIBEVENT
+		tmpSmppConn = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i), base);
+#else
 		tmpSmppConn = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i));
+#endif
 		tmpSmppConn->Stop();
 		Esme::RemoveEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i));
 	}
 	Esme::StopLinkCheck();
+#ifndef WITH_LIBEVENT
 	Esme::StopReader();
+#endif
+
 #ifndef WITH_THREAD_POOL
 	Esme::StopPduProcess();
 #endif

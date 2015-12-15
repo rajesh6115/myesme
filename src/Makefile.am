@@ -33,8 +33,8 @@ libsmppapputil_la_LDFLAGS = -shared -fPIC ${libxml2_LIBS} `mysql_config --libs`
 
 bin_PROGRAMS = myesme esmedbins
 myesme_SOURCES = Main.cpp Esme.cpp EsmePduProcessThread.cpp EsmeSenderThread.cpp EsmeConfig.cpp SmsAppConfig.cpp Externs.cpp SmsCampaign.cpp EsmeGetterSetter.cpp MessageQueue.cpp
-myesme_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS} -std=c++11 `mysql_config --cflags` -D_MESSAGE_QUEUE_UPDATE_ -DWITH_THREAD_POOL
-myesme_LDFLAGS = ${libxml2_LIBS} libsmpp.la libsmppapputil.la -lpthread `mysql_config --libs` -lrt
+myesme_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS} ${libevent_CFLAGS} -std=c++11 `mysql_config --cflags` -D_MESSAGE_QUEUE_UPDATE_ -DWITH_THREAD_POOL 
+myesme_LDFLAGS = ${libxml2_LIBS} ${libevent_LIBS} libsmpp.la libsmppapputil.la -lpthread `mysql_config --libs` -lrt -levent_pthreads
 
 esmedbins_SOURCES = SmsDbInsertConfig.cpp DbInsertApp.cpp MessageQueue.cpp
 esmedbins_CPPFLAGS = -I ${top_srcdir}/include ${libxml2_CFLAGS} -std=c++11 `mysql_config --cflags` -D_MESSAGE_QUEUE_UPDATE_

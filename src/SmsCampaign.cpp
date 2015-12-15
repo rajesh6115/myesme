@@ -63,7 +63,11 @@ void * CampaignThread(void *arg){
 	std::list<Esme *>::iterator l_esmeItr = l_esmeInstanceList.begin();
 	Esme *tempSmppConObj=NULL;
 	for(int i=0; i< CG_MyAppConfig.GetMaxinumSmppConnection(); i++){
+#ifdef WITH_LIBEVENT
+		tempSmppConObj = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i), NULL);
+#else
 		tempSmppConObj = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i));
+#endif
 		if(tempSmppConObj){
 			if(tempSmppConObj->GetEsmeType() != BIND_RDONLY){
 				// Add to List
@@ -120,7 +124,7 @@ void * CampaignThread(void *arg){
 		return NULL;
 	}
 	// Start Push Processing Campaign
-	std::string msisdnPickingQuery = "SELECT iSNo,vcSource,vcMsisdn,vcMessage,iMsgType FROM ";
+	std::string msisdnPickingQuery = "SELECT iSNo,vcSource,vcMsisdn,vcMessage,iMsgType,iSrcTon,iSrcNpi,iDestTon,iDestNpi FROM ";
 	msisdnPickingQuery += l_tableName;
 	msisdnPickingQuery += " WHERE iCampaignId=";
 	memset(tempBuff, 0x00, sizeof(tempBuff));
@@ -191,6 +195,22 @@ void * CampaignThread(void *arg){
 			}
 			if(tempRow[4]){
 				tempSmsData.type = atoi(tempRow[4]);
+			}
+			//iSrcTon
+			if(tempRow[5]){
+				tempSmsData.src_ton = atoi(tempRow[5]);
+			}
+			//iSrcNpi
+			if(tempRow[6]){
+				tempSmsData.src_npi = atoi(tempRow[6]);
+			}
+			//iDestTon
+			if(tempRow[7]){
+				tempSmsData.dest_ton = atoi(tempRow[7]);
+			}
+			//iDestNpi
+			if(tempRow[8]){
+				tempSmsData.dest_npi = atoi(tempRow[8]);
 			}
 			//myEsme.SendSms(tempSmsData);
 			unsigned long l_campaign_usleep=SMS_CAMPAIGN_ENQUEUE_USLEEP;

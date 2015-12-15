@@ -13,7 +13,7 @@ void Esme::SendOneSms(void){
 			pduseq = this->GetNewSequenceNumber();
 			// Register to smsdata
 			this->RegisterSmsData(pduseq, tmpSms);
-			this->SendSubmitSm(pduseq, tmpSms.party_a, tmpSms.party_b, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
+			this->SendSubmitSm(pduseq, tmpSms.party_a, tmpSms.src_ton, tmpSms.src_npi, tmpSms.party_b, tmpSms.dest_ton, tmpSms.dest_npi, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
 		}else{
 			APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "No SMS FOR : %s", this->GetEsmeName().c_str());
 		}
@@ -74,7 +74,7 @@ void *Esme::ThSmsSender(void *arg){
 						pduseq = objAddr->GetNewSequenceNumber();
 						// Register to smsdata
 						objAddr->RegisterSmsData(pduseq, tmpSms);
-						objAddr->SendSubmitSm(pduseq, tmpSms.party_a, tmpSms.party_b, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
+						objAddr->SendSubmitSm(pduseq, tmpSms.party_a, (Smpp::Uint8)tmpSms.src_ton, (Smpp::Uint8)tmpSms.src_npi, tmpSms.party_b, (Smpp::Uint8)tmpSms.dest_ton, (Smpp::Uint8)tmpSms.dest_npi, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
 						noSmsThCnt = 0;
 					}else{
 						// sleep for some second to give chance to other thread run

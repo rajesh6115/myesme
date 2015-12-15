@@ -57,6 +57,10 @@ typedef struct smsdata{
         char table[16];
 	uint8_t msg[512];
         uint8_t type;
+	uint8_t src_ton;
+	uint8_t src_npi;
+	uint8_t dest_ton;
+	uint8_t dest_npi;
 }sms_data_t;
 typedef enum thread_status{
         TH_ST_IDLE=0,

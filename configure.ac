@@ -34,6 +34,20 @@ AC_PROG_LIBTOOL(libtool)
 # check for libxml2
 PKG_CHECK_MODULES([libxml2], [libxml-2.0])
 
+# check for libevent
+AC_ARG_WITH([libevent], [  --with-libevent            enable libevent])
+if test "$with_libevent" == "yes"
+then
+	AC_MSG_NOTICE([Checking for libevent2 and its requirements.])
+	PKG_CHECK_MODULES([libevent], [libevent >= 2.0], with_libevent=yes, with_libevent=no)
+	if test "$with_libevent" == "no"
+	then
+		AC_MSG_NOTICE([libevent Enabled But requirement not matching ])
+		exit 1
+	else
+		AC_DEFINE(WITH_LIBEVENT, 1 ,[libevent is Enabled]) 
+	fi
+fi
 # libmysqlclient library finding
 #mysql_CPPFLAGS=`mysql_config --cflags`
 #mysql_LDFLAGS=`mysql_config --libs`
