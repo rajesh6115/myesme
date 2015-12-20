@@ -1,5 +1,10 @@
 language: cpp
-install: make get-deps
+before_script: autoreconf -i && ./configure
+install:
+install:
+- sudo apt-get update
+- sudo apt-get install g++ libtool autoconf automake libmysqlclient-dev exuberant-ctags libxml2-dev pkg-config make
+- make
 compiler: gcc
 os: linux
-sudo: false
+sudo: required
