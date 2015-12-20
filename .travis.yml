@@ -1,0 +1,5 @@
+language: cpp
+install: make get-deps
+compiler: gcc
+os: linux
+sudo: false
