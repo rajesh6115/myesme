@@ -4,9 +4,17 @@ install:
 install:
 - sudo apt-get update
 - sudo apt-get install g++ libtool autoconf automake libmysqlclient-dev exuberant-ctags libxml2-dev pkg-config make
+- if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
 - autoreconf -iv
 - ./configure
 - make
 compiler: gcc
 os: linux
 sudo: required
+addons:
+      apt:
+        sources:
+        - ubuntu-toolchain-r-test
+        packages:
+        - gcc-4.8
+        - g++-4.8
