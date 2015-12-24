@@ -5,12 +5,16 @@ thread_status_t Esme::pduProcessThStatus;
 pthread_t Esme::sendThId;
 thread_status_t Esme::sendThStatus;
 #endif
+#ifndef WITH_LIBEVENT
 // Static Memebers Of Class
 pthread_t Esme::rcvThId;
 thread_status_t Esme::rcvThStatus;
+#endif
+
+#ifndef WITH_LIBEVENT
 pthread_t Esme::linkThId;
 thread_status_t Esme::linkThStatus;
-
+#endif
 // vcMsgId Map
 std::map<std::string, sms_data_t> Esme::m_vcMsgIdMap;
 std::mutex Esme::m_vcMsgIdMapLock;
@@ -132,6 +136,12 @@ Esme::~Esme(void){
 #ifdef _MESSAGE_QUEUE_UPDATE_
 	m_updateQueryMsgQueue.Close();
 #endif
+
+#ifdef WITH_LIBEVENT
+	if(m_linkCheckEvent){
+		event_free(m_linkCheckEvent);
+	}	
+#endif
 }
 
 #ifdef WITH_LIBEVENT
@@ -139,7 +149,13 @@ Esme::Esme(std::string name, std::string cfgFile, struct event_base *base):Esme(
 	if(base != NULL){
 		m_base = base;
 	}
-	//Esme(name, cfgFile);
+	//struct event *m_linkCheckEvent;
+        //struct timeval m_linkCheckTimerValue;
+	m_linkCheckEvent = event_new(m_base, -1, EV_PERSIST, &Esme::OnLinkCheckTimeOut, this);
+	m_linkCheckTimerValue.tv_sec = 30;
+	m_linkCheckTimerValue.tv_usec = 0;
+	evtimer_add(m_linkCheckEvent, &m_linkCheckTimerValue);
+	event_base_set(m_base, m_linkCheckEvent);
 }
 #endif
 
@@ -248,7 +264,7 @@ int Esme::OpenConnection(void){
         m_smscInfo.sin_family = PF_INET;
         m_smscInfo.sin_addr.s_addr = inet_addr(this->m_host.c_str());
         m_smscInfo.sin_port = htons(this->m_port);
-	APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connecting to HOST=%s PORT=%u ", m_host.c_str(), m_port );
+	APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connecting to HOST=%s PORT=%u ID=%s ", m_host.c_str(), m_port, m_esmeid.c_str() );
         bufferevent_setcb(m_bufferEvent, &Esme::ReadCallBack, NULL, &Esme::EventCallBack, this );
         bufferevent_enable(m_bufferEvent, EV_READ|EV_WRITE);
 	if(bufferevent_socket_connect(m_bufferEvent, (struct sockaddr *)&m_smscInfo, sizeof(m_smscInfo)) < 0){
@@ -651,6 +667,7 @@ int Esme::SendEnquireLink(void){
 	return Write(tmpBuf);
 }
 
+#ifndef WITH_LIBEVENT
 int Esme::StartLinkCheck(void){
 	linkThStatus = TH_ST_REQ_RUN;
 	if(pthread_create(&linkThId, NULL, &(Esme::LinkCheckThread), NULL)){
@@ -676,6 +693,7 @@ int Esme::StopLinkCheck(void){
 thread_status_t Esme::GetEnquireLinkThStatus(void){
 	return linkThStatus;
 }
+
 // TODO:
 // 1. Dose This Thread Requred
 // 2. Add Some Timer Logic Here 
@@ -745,6 +763,61 @@ void *Esme::LinkCheckThread(void *arg){
 	APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "Link Check Thread Exiting...");
 	return NULL;
 }
+
+#else
+void Esme::OnLinkCheckTimeOut(int fd, short event, void *arg){
+	Esme *esmeObjp = (Esme *) arg;
+	if(esmeObjp == NULL){
+		return ;
+	}
+	switch(esmeObjp->GetEsmeState()){
+		case Esme::ST_ERROR: //8
+			{
+				APP_LOGGER(CG_MyAppLogger, LOG_WARNING,"Tring To Re Start Connection %s", esmeObjp->GetEsmeName().c_str());
+				esmeObjp->Stop();
+			}
+			break;
+		case Esme::ST_IDLE: // 0
+			{
+				if(esmeObjp->Start() == -1){
+					APP_LOGGER(CG_MyAppLogger, LOG_ERROR,"Failed To Start Connection %s", esmeObjp->GetEsmeName().c_str());
+				}
+			}
+			break;
+		case Esme::ST_BIND_REQ:
+			{
+				APP_LOGGER(CG_MyAppLogger, LOG_WARNING," Bind Requested %s", esmeObjp->GetEsmeName().c_str());
+			}
+			break;
+		case Esme::ST_BIND: // 3
+			{
+				esmeObjp->SendEnquireLink();
+			}
+			break;
+		case Esme::ST_BIND_FAIL: // 4
+			{
+				APP_LOGGER(CG_MyAppLogger, LOG_ERROR," Trying To Re-Bind %s", esmeObjp->GetEsmeName().c_str());
+				esmeObjp->Bind();
+			}
+			break;
+		case Esme::ST_CONNECTED: // 1
+			{
+				esmeObjp->Bind();
+			}
+			break;
+		case Esme::ST_NOTCONNECTED:
+			{
+				APP_LOGGER(CG_MyAppLogger, LOG_ERROR," Trying To Connect Socket %s", esmeObjp->GetEsmeName().c_str());
+				esmeObjp->OpenConnection();
+			}
+			break;
+		default:
+			APP_LOGGER(CG_MyAppLogger, LOG_ERROR," SHOULD NOT BE IN STATE %s: %d", esmeObjp->GetEsmeName().c_str(), esmeObjp->GetEsmeState());
+			break;
+
+	}
+}
+#endif
 
 #ifndef WITH_LIBEVENT
 

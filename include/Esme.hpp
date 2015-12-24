@@ -59,6 +59,8 @@ class Esme{
 #ifdef WITH_LIBEVENT
 		struct event_base *m_base;
 		struct bufferevent *m_bufferEvent;
+		struct event *m_linkCheckEvent;
+		struct timeval m_linkCheckTimerValue;
 #else
 		int m_esmeSocket;
 		// Regulated Instance Creation
@@ -118,6 +120,7 @@ class Esme{
 		//special case when we are processing delivery report 
 		// before processing submit_sm_resp for same
 		static std::map<std::string, uint8_t> m_vcMsgIdSyncMap;
+#ifndef WITH_LIBEVENT
 		// Receiving thread 
 		// TODO: 
 		// 1. One Thread For Reading For All Object
@@ -126,6 +129,9 @@ class Esme{
 		static pthread_t rcvThId;
 		static thread_status_t rcvThStatus;
 		static void *ThSmsReader(void *);
+#endif
+
+#ifndef WITH_LIBEVENT
 		// Link Thread 
 		// TODO: Decide About This Thread Very Less Job to Thread Resource
 		// One Thread for Making Live All Socket
@@ -134,6 +140,10 @@ class Esme{
 		static pthread_t linkThId;
 		static thread_status_t linkThStatus;
 		static void *LinkCheckThread(void *);
+#else
+		static void OnLinkCheckTimeOut(int fd, short event, void *arg);
+#endif
+
 #ifdef WITH_THREAD_POOL
 		void OnReceivePdu(void);
 		void SendOneSms(void);
@@ -207,7 +217,7 @@ class Esme{
 		static int StopPduProcess(void);
 		static thread_status_t GetPduProcessThStatus(void);
 #endif
-
+#ifndef WITH_LIBEVENT
 // From Lib Event Once Timer will be Implemented 
 // we can elemenate Linkcheck thread
 // TODO: Introduce Libevent Timer For Linkcheck Thread
@@ -217,7 +227,7 @@ class Esme{
 		static int StartLinkCheck(void);
 		static int StopLinkCheck(void);
 		static thread_status_t GetEnquireLinkThStatus(void);
-
+#endif
 		int Start(void);
 		int Stop(void);
 		std::string GetEsmeName(void);
