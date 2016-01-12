@@ -1,97 +1,173 @@
-#include <iostream>
-#include <cstring>
-#include <sstream>
-
-#include <sys/socket.h>
+#ifndef ASYNC_TCP_SOCKET_HPP
+#define ASYNC_TCP_SOCKET_HPP
 #include <event.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
-#define HOST "127.0.0.1"
-#define PORT 80
+#include <cstring>
+#include <cstdlib>
+#include <NetBuffer.hpp>
+#include <deque>
 
 class AsyncTcpSocket{
 public:
-	AsyncTcpSocket(struct event_base *base, std::string name);
-	int Connect(void);
-	static void ReadCallBack(struct bufferevent *bev, void *ptr);
-	static void EventCallBack(struct bufferevent *bev, short events, void *arg);
-	int Open(std::string host, uint16_t port);
+	AsyncTcpSocket(struct event_base *l_event_base, const std::string& host, const unsigned short port);
+	int OpenConnection();
+	int CloseConnection();
+	ssize_t Write(const void *l_buffer, const size_t l_buffer_size);
+	virtual void OnDataRecived(const void *l_buffer, const size_t length)=0;
 private:
-	struct event_base *m_base;
-	struct bufferevent *m_bufferEvent;
-	struct sockaddr_in m_servAddr;
-	std::string m_host;
-	uint16_t m_port;
-	std::string m_name;
+	static void read_event_handler( evutil_socket_t fd, short events, void *arg);
+	static void write_event_handler( evutil_socket_t fd, short events, void *arg);
+	struct sockaddr_in m_serv_addr;
+	struct event_base *m_event_base;
+	struct event *m_read_event;
+	struct event *m_write_event;
+	evutil_socket_t m_sd;
+	const std::string m_host;
+	const unsigned short m_port;
+	std::deque<NetBuffer> m_write_buffers;
 };
 
-AsyncTcpSocket::AsyncTcpSocket(struct event_base *base, std::string name):m_base(base),m_name(name){
-	memset(&m_servAddr, 0x00, sizeof(m_servAddr));
+#endif
+
+#ifdef ASYNC_TCP_SOCKET_HPP
+
+AsyncTcpSocket::AsyncTcpSocket(struct event_base *l_event_base, const std::string& l_host, const unsigned short l_port):m_event_base(l_event_base), m_host(l_host), m_port(l_port)
+{
+	m_read_event = NULL;
+	m_write_event= NULL;
+	m_sd = -1;
+	memset(&m_serv_addr, 0x00, sizeof(m_serv_addr));
 }
 
-int AsyncTcpSocket::Open(std::string host, uint16_t port){
-	m_host = host;
-	m_port = port;
-	m_bufferEvent = bufferevent_socket_new(m_base, -1, BEV_OPT_CLOSE_ON_FREE);
-	if(m_bufferEvent == NULL){
+void AsyncTcpSocket::read_event_handler( evutil_socket_t fd, short events, void *arg)
+{
+	AsyncTcpSocket *socket_obj_p = (AsyncTcpSocket *) arg;
+	char l_buffer[4096];
+	ssize_t l_buffer_size;
+	l_buffer_size = recv(fd, l_buffer, sizeof(l_buffer), 0);
+	if(l_buffer_size > 0){
+		socket_obj_p->OnDataRecived(l_buffer, l_buffer_size);
+	}else{
+		// Some Error So Close Socket
+		socket_obj_p->CloseConnection();
+	}
+}
+
+void AsyncTcpSocket::write_event_handler( evutil_socket_t fd, short events, void *arg){
+	AsyncTcpSocket *socket_obj_p = (AsyncTcpSocket *) arg;
+	static NetBuffer tempObj;
+	if(tempObj.GetLength() == 0){
+		tempObj = socket_obj_p->m_write_buffers.front();
+		socket_obj_p->m_write_buffers.pop_front();
+	}
+	ssize_t ret_val;
+	ret_val = send(fd, tempObj.GetBuffer(), tempObj.GetLength(), 0);
+	if(ret_val == tempObj.GetLength()){
+		tempObj.Erase();
+	}else if (ret_val > 0){
+		tempObj.Erase(0, ret_val);
+		event_add(socket_obj_p->m_write_event, NULL);
+	}else{
+		// error
+		tempObj.Erase(); // Loss Of Data
+		socket_obj_p->CloseConnection();
+	}
+}
+
+int AsyncTcpSocket::OpenConnection()
+{
+	if(m_sd == -1){
+		m_sd = socket(AF_INET, SOCK_STREAM, 0);
+	}
+	if(m_sd < 0){
 		return -1;
 	}
-	m_servAddr.sin_family = AF_INET;
-	m_servAddr.sin_addr.s_addr = inet_addr(m_host.c_str());
-	m_servAddr.sin_port = htons(m_port);
-	bufferevent_setcb(m_bufferEvent, &AsyncTcpSocket::ReadCallBack, NULL, &AsyncTcpSocket::EventCallBack, this );
-	bufferevent_enable(m_bufferEvent, EV_READ|EV_WRITE);
+	evutil_make_socket_nonblocking( m_sd);
+	if( m_read_event == NULL){
+		m_read_event = event_new(m_event_base, m_sd, EV_READ | EV_PERSIST, &AsyncTcpSocket::read_event_handler, this);
+	}
+	if(m_read_event == NULL){
+		return -1;
+	}else{
+		// We Can Implement TimeOut For Socket Here By replacing NULL with struct timeval
+		event_add( m_read_event, NULL);
+	}
+	m_serv_addr.sin_family = AF_INET;
+	m_serv_addr.sin_addr.s_addr = inet_addr(m_host.c_str());
+	m_serv_addr.sin_port = htons(m_port);
+	return connect( m_sd, (const struct sockaddr *) &m_serv_addr, sizeof(m_serv_addr));
+}
+
+int AsyncTcpSocket::CloseConnection()
+{
+	if(m_read_event){
+		event_del(m_read_event);
+		event_free(m_read_event);
+		m_read_event = NULL;
+	}
+	if(m_write_event){
+		event_del( m_write_event);
+		event_free(m_write_event);
+		m_write_event = NULL;
+	}
+	if(m_sd > 0){
+		//close(m_sd);
+		evutil_closesocket(m_sd);
+		m_sd = -1;
+	}
+	if(!m_write_buffers.empty()){
+		// Flush Existing Buffers
+		m_write_buffers.erase(m_write_buffers.begin(), m_write_buffers.end());	
+	}
 	return 0;
 }
 
-int AsyncTcpSocket::Connect(void){
-	if(bufferevent_socket_connect(m_bufferEvent, (struct sockaddr *)&m_servAddr, sizeof(m_servAddr)) < 0){
-		bufferevent_free(m_bufferEvent);
-		return -1;
+ssize_t AsyncTcpSocket::Write(const void *l_buffer, const size_t l_buffer_size){
+/*
+	ssize_t l_ret_val=0;
+	ssize_t l_bytes_written=0;
+	do{
+		l_ret_val = send( m_sd, l_buffer, l_buffer_size, 0);
+		if( l_ret_val < 0){
+			return -1;
+		}else{
+			l_bytes_written += l_ret_val;
+		}
+	}while(l_bytes_written != l_buffer_size);
+*/
+	if(m_write_event == NULL){
+		m_write_event = event_new(m_event_base, m_sd, EV_WRITE, &AsyncTcpSocket::write_event_handler, this);
 	}
-	return 0;
+	NetBuffer tempObj;
+	tempObj.Append(l_buffer, l_buffer_size);
+	m_write_buffers.push_back(tempObj);
+	event_add(m_write_event, NULL);
 }
 
-void AsyncTcpSocket::ReadCallBack(struct bufferevent *bev, void *ptr){
-	char buf[1024];
-	int n;
-	struct evbuffer *input = bufferevent_get_input(bev);
-	while ((n = evbuffer_remove(input, buf, sizeof(buf))) > 0) { 
-		fwrite(buf, 1, n, stdout);
-	}
-	fprintf(stdout, "##################%s#########\n", ((AsyncTcpSocket*)ptr)->m_name.c_str());
-}
+#endif
 
+#include <iostream>
+class AsyncSmppSocket: public AsyncTcpSocket
+{
+public:
+	AsyncSmppSocket(struct event_base *l_event_base, const std::string& l_host, const unsigned short &l_port):AsyncTcpSocket(l_event_base, l_host, l_port)
+	{
+	}
+	void OnDataRecived(const void *l_buffer, const size_t l_buffer_size)
+        {
+                std::cout << "\nData Recived" << this << std::endl;
+                std::cout.write((const char *)l_buffer, l_buffer_size);
+        }
+};
 
-void AsyncTcpSocket::EventCallBack(struct bufferevent *bev, short events, void *arg){
-	if(events & BEV_EVENT_CONNECTED){
-		printf("Connected %s:%u FOR %s \n", ((AsyncTcpSocket *)arg)->m_host.c_str(), ((AsyncTcpSocket *)arg)->m_port, ((AsyncTcpSocket *)arg)->m_name.c_str());
-		evbuffer_add_printf(bufferevent_get_output(bev), "GET %s\r\n", "/");
-	}else if(events & BEV_EVENT_ERROR){
-		printf("Error in Connection : %s\n",((AsyncTcpSocket *) arg)->m_name.c_str());
-	}
-}
-
-int main(int argc, char *argv[]){
-	std::cout << "Hello Async Socket Programming" <<std::endl;
-	struct event_base *base = NULL;
-	base = event_base_new();
-	if(base == NULL){ 
-		return -1;
-	}
-	AsyncTcpSocket *objp;
-	std::ostringstream oss;
-	for(int i=0; i <10; i++){
-		oss.str("");
-		oss.clear();
-		oss << "object";
-		oss << i;
-		objp = new AsyncTcpSocket(base, oss.str());
-		objp->Open(HOST, PORT);
-		objp->Connect();
-	}
-	event_base_dispatch(base);
-	event_base_free(base);
+int main (int argc, char *argv[]){
+	struct event_base *l_event_base = event_base_new();
+	AsyncSmppSocket asynSockObj1(l_event_base, "127.0.0.1", 80);
+	asynSockObj1.OpenConnection();
+	const char *msg = "GET / \n\n\r";
+	asynSockObj1.Write(msg, strlen(msg));
+	event_base_dispatch(l_event_base);
 	return 0;
 }
