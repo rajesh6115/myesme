@@ -165,7 +165,9 @@ Esme::Esme(std::string name, std::string cfgFile){
 	this->m_host = DFL_SMPP_URL;
 	this->m_port = DFL_SMPP_PORT;
 #ifdef WITH_LIBEVENT
-	m_bufferEvent = NULL;
+	m_read_event = NULL;
+	m_write_event = NULL;
+	m_sd = -1;
 #else
 	m_esmeSocket = -1;
 #endif
@@ -241,36 +243,36 @@ Smpp::Uint32 Esme::GetNewSequenceNumber(void){
 	return tmp;
 }
 
-#ifdef WITH_LIBEVENT
-void Esme::EventCallBack(struct bufferevent *bev, short events, void *arg){
-	Esme *objp = (Esme*)arg;
-        if(events & BEV_EVENT_CONNECTED){
-		APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connected To HOST=%s PORT=%u ", objp->m_host.c_str(), objp->m_port );
-		objp->m_esmeState = ST_CONNECTED;
-        }else if(events & BEV_EVENT_ERROR){
-                //printf("Error in Connection : %s\n",((AsyncTcpSocket *) arg)->m_name.c_str());
-		APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "NOT ABLE to Connect HOST=%s PORT=%u ", objp->m_host.c_str(), objp->m_port );
-		objp->m_esmeState = ST_NOTCONNECTED;
-        }
-}
-#endif
-
 int Esme::OpenConnection(void){
 #ifdef WITH_LIBEVENT
-        if(m_bufferEvent == NULL){
-		m_bufferEvent = bufferevent_socket_new(m_base, -1, BEV_OPT_CLOSE_ON_FREE);
-        }
 	memset(&m_smscInfo, 0x00, sizeof(m_smscInfo));
         m_smscInfo.sin_family = PF_INET;
         m_smscInfo.sin_addr.s_addr = inet_addr(this->m_host.c_str());
         m_smscInfo.sin_port = htons(this->m_port);
 	APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connecting to HOST=%s PORT=%u ID=%s ", m_host.c_str(), m_port, m_esmeid.c_str() );
-        bufferevent_setcb(m_bufferEvent, &Esme::ReadCallBack, NULL, &Esme::EventCallBack, this );
-        bufferevent_enable(m_bufferEvent, EV_READ|EV_WRITE);
-	if(bufferevent_socket_connect(m_bufferEvent, (struct sockaddr *)&m_smscInfo, sizeof(m_smscInfo)) < 0){
-                bufferevent_free(m_bufferEvent);
+	if(m_sd == -1){
+                m_sd = socket(AF_INET, SOCK_STREAM, 0);
+        }
+        if(m_sd < 0){
                 return -1;
         }
+	evutil_make_socket_nonblocking( m_sd);
+	if( m_read_event == NULL){
+                m_read_event = event_new(m_base, m_sd, EV_READ | EV_PERSIST, &Esme::read_event_handler, this);
+        }
+        if(m_read_event == NULL){
+                return -1;
+        }else{
+                // We Can Implement TimeOut For Socket Here By replacing NULL with struct timeval
+                event_add( m_read_event, NULL);
+        }
+	if(connect( m_sd, (const struct sockaddr *) &m_smscInfo, sizeof(m_smscInfo))){
+		m_esmeState = ST_NOTCONNECTED;
+                return -1;
+	}else{
+		APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Connected To HOST=%s PORT=%u ", m_host.c_str(), m_port );
+                m_esmeState = ST_CONNECTED;
+	}
 #else
 	if(m_esmeSocket == -1){
 		m_esmeSocket = socket(PF_INET, SOCK_STREAM, 0);
@@ -307,10 +309,24 @@ int Esme::CloseConnection(void){
 	if (m_esmeState == ST_IDLE || m_esmeState == ST_NOTCONNECTED){
 		return 0;
 	}
-        if(m_bufferEvent != NULL){
-		bufferevent_free(m_bufferEvent);
-	}
-	m_bufferEvent=NULL;
+	 if(m_read_event){
+                event_del(m_read_event);
+                event_free(m_read_event);
+                m_read_event = NULL;
+        }
+        if(m_write_event){
+                event_del( m_write_event);
+                event_free(m_write_event);
+                m_write_event = NULL;
+        }
+        if(m_sd > 0){
+                evutil_closesocket(m_sd);
+                m_sd = -1;
+        }
+	if(!m_write_buffers.empty()){
+                // Flush Existing Buffers
+                m_write_buffers.erase(m_write_buffers.begin(), m_write_buffers.end());
+        }
 #else
 	if (m_esmeState == ST_IDLE || this->m_esmeSocket == -1 || m_esmeState == ST_NOTCONNECTED){
 		return 0; // Already disconnected
@@ -362,16 +378,33 @@ int Esme::UnRegisterPdu(NetBuffer &tmpNetBuf){
 }
 
 #ifdef WITH_LIBEVENT
-int Esme::Write(NetBuffer &robj){
-        uint32_t writtenBytes;
-        writtenBytes = evbuffer_add(bufferevent_get_output(m_bufferEvent), robj.GetBuffer(), robj.GetLength());
-        if(writtenBytes == -1){
-                APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN Writing To SMSC PLEASE RECONNECT" );
-                m_esmeState = Esme::ST_ERROR;
-                return -1;
+void Esme::write_event_handler( evutil_socket_t fd, short events, void *arg){
+        Esme *socket_obj_p = (Esme *) arg;
+        static NetBuffer tempObj;
+        if(tempObj.GetLength() == 0){
+                tempObj = socket_obj_p->m_write_buffers.front();
+                socket_obj_p->m_write_buffers.pop_front();
+        }
+        ssize_t ret_val;
+        ret_val = send(fd, tempObj.GetBuffer(), tempObj.GetLength(), 0);
+        if(ret_val == tempObj.GetLength()){
+                tempObj.Erase();
+        }else if (ret_val > 0){
+                tempObj.Erase(0, ret_val);
+                event_add(socket_obj_p->m_write_event, NULL);
         }else{
-        	return robj.GetLength();
-	}
+                tempObj.Erase(); // Loss Of Data
+                socket_obj_p->CloseConnection();
+        }
+}
+
+int Esme::Write(NetBuffer &robj){
+	if(m_write_event == NULL){
+                m_write_event = event_new(m_base, m_sd, EV_WRITE, &Esme::write_event_handler, this);
+        }
+	m_write_buffers.push_back(robj);
+	event_add(m_write_event, NULL);
+        return robj.GetLength();
 }
 #endif
 
@@ -390,26 +423,26 @@ int Esme::Write(NetBuffer &robj){
 #endif
 
 #ifdef WITH_LIBEVENT
-void Esme::ReadCallBack(struct bufferevent *bev, void *ptr){
+void Esme::read_event_handler( evutil_socket_t fd, short events, void *arg){
+	Esme *esmeObj = (Esme *) arg;
 	int32_t readBytes;
 	uint8_t readBuffer[MAX_READ_BUFFER_LENGTH];
 	memset(readBuffer, 0x00, sizeof(readBuffer));
-        struct evbuffer *input = bufferevent_get_input(bev);
-        while ((readBytes = evbuffer_remove(input, readBuffer, sizeof(readBuffer))) > 0) {
-                ((Esme *)ptr)->m_readNetBuffer.Append(readBuffer, readBytes);
-        }
+	readBytes = recv(fd, readBuffer, sizeof(readBuffer), 0);
+	
+        esmeObj->m_readNetBuffer.Append(readBuffer, readBytes);
 	NetBuffer tempBuf;	
-	uint32_t requireBytes = Smpp::get_command_length((const Smpp::Uint8*)((Esme *)ptr)->m_readNetBuffer.GetBuffer());
-        while( (requireBytes>0) && (requireBytes <= ((Esme *)ptr)->m_readNetBuffer.GetLength()) ){
+	uint32_t requireBytes = Smpp::get_command_length((const Smpp::Uint8*)esmeObj->m_readNetBuffer.GetBuffer());
+        while( (requireBytes>0) && (requireBytes <= esmeObj->m_readNetBuffer.GetLength()) ){
                 tempBuf.Erase();
-                tempBuf.Append(((Esme *)ptr)->m_readNetBuffer.GetBuffer(), requireBytes);
-                ((Esme *)ptr)->m_readNetBuffer.Erase(0, requireBytes);
-                ((Esme *)ptr)->receiveQueue.push(tempBuf);
+                tempBuf.Append(esmeObj->m_readNetBuffer.GetBuffer(), requireBytes);
+                esmeObj->m_readNetBuffer.Erase(0, requireBytes);
+                esmeObj->receiveQueue.push(tempBuf);
 #ifdef  WITH_THREAD_POOL
-                g_threadPool.enqueue(&Esme::OnReceivePdu, ((Esme *)ptr));
+                g_threadPool.enqueue(&Esme::OnReceivePdu, esmeObj);
 #endif
-                if(((Esme *)ptr)->m_readNetBuffer.GetLength()){
-                requireBytes = Smpp::get_command_length((const Smpp::Uint8*)((Esme *)ptr)->m_readNetBuffer.GetBuffer());
+                if(esmeObj->m_readNetBuffer.GetLength()){
+                requireBytes = Smpp::get_command_length((const Smpp::Uint8*)esmeObj->m_readNetBuffer.GetBuffer());
                 }else{
                         requireBytes = 0;
                 }

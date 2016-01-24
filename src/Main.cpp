@@ -14,12 +14,51 @@ void int_signal(int num){
 	IS_PROCESS_RUN = 0;
 }
 
+void check_for_active_campaign(int fd, short event, void *arg){
+	pthread_t campaignThId;
+	uint32_t campaignId=0;
+	std::map<uint32_t, campaign_info_t>::iterator l_campaignItr;
+	if(campaignId = IsActiveCampaign()){
+		APP_LOGGER(CG_MyAppLogger,LOG_DEBUG, "There is a Active Campaign with Campaign Id %u",campaignId);
+		campaign_info_t tempCampaignInfo;
+		tempCampaignInfo.id = campaignId;
+		tempCampaignInfo.thStatus = TH_ST_REQ_RUN;
+		tempCampaignInfo.status = CAMPAIGN_ST_SCHEDULED;
+		G_smsCampaignMap.insert(std::pair<uint32_t, campaign_info_t>(campaignId, tempCampaignInfo));
+		if(pthread_create(&tempCampaignInfo.thId, NULL, CampaignThread, &campaignId)==0){
+			APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Starting Campaign with Campaign ID %u ", campaignId);
+			l_campaignItr = G_smsCampaignMap.find(campaignId);
+			if(l_campaignItr != G_smsCampaignMap.end()){
+				l_campaignItr->second.thId = tempCampaignInfo.thId;
+				while( l_campaignItr->second.thStatus == TH_ST_REQ_RUN){
+					sleep(1);
+					APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Waiting For Campaign with Campaign ID %u  to Start...", campaignId);
+				}
+			}else{
+				APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "No Entries in Campaign Map For Campaign %u", campaignId);
+			}
+		}else{
+			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "pthread_create Failed For Campaign %u", campaignId);
+			l_campaignItr = G_smsCampaignMap.find(campaignId);
+			if(l_campaignItr != G_smsCampaignMap.end()){
+				G_smsCampaignMap.erase(l_campaignItr);
+			}
+		}
+	}else{
+		for(l_campaignItr = G_smsCampaignMap.begin(); l_campaignItr != G_smsCampaignMap.end(); l_campaignItr ++){
+			if(l_campaignItr->second.thStatus == TH_ST_STOP){
+				pthread_join(l_campaignItr->second.thId, NULL);
+				APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Removing Campaign %u From Campaign Map", l_campaignItr->second.id);
+				G_smsCampaignMap.erase(l_campaignItr);
+			}
+		}
+	}
+}
+
 int main(int argc, char *argv[]){
 	//std::cout << "Multi Esme Testing Instance" << std::endl;
 	signal(SIGINT, int_signal);
 	signal(SIGPIPE, SIG_IGN);
-	pthread_t campaignThId;
-	uint32_t campaignId=0;
 	char configfile[256]={0x00};
 	if(argc != 2){
 		fprintf(stderr, "USAGE: %s <configfile>\n", argv[0]);
@@ -67,53 +106,19 @@ int main(int argc, char *argv[]){
 		tmpSmppConn = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i));
 #endif
 	}
+	struct event *campaign_check_event;
+	struct timeval campaign_timeout;
+	campaign_timeout.tv_sec = 60;
+	campaign_timeout.tv_usec = 0;
+	campaign_check_event = event_new(base, -1, EV_PERSIST, check_for_active_campaign, NULL);
+	evtimer_add(campaign_check_event, &campaign_timeout);
+	event_base_set(base, campaign_check_event);
 	IS_PROCESS_RUN = 1;
 	while(IS_PROCESS_RUN){
 		event_base_dispatch(base);
 	}
 	event_base_free(base);
 	return 0;
-	std::map<uint32_t, campaign_info_t>::iterator l_campaignItr;
-	while(IS_PROCESS_RUN){
-		if(campaignId = IsActiveCampaign()){
-			APP_LOGGER(CG_MyAppLogger,LOG_DEBUG, "There is a Active Campaign with Campaign Id %u",campaignId);
-			campaign_info_t tempCampaignInfo;
-			tempCampaignInfo.id = campaignId;
-			tempCampaignInfo.thStatus = TH_ST_REQ_RUN;
-			tempCampaignInfo.status = CAMPAIGN_ST_SCHEDULED;
-			// Insert To Campaign Map
-			G_smsCampaignMap.insert(std::pair<uint32_t, campaign_info_t>(campaignId, tempCampaignInfo));
-			if(pthread_create(&tempCampaignInfo.thId, NULL, CampaignThread, &campaignId)==0){
-				APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Starting Campaign with Campaign ID %u ", campaignId);
-				l_campaignItr = G_smsCampaignMap.find(campaignId);
-				if(l_campaignItr != G_smsCampaignMap.end()){
-					l_campaignItr->second.thId = tempCampaignInfo.thId;
-					while( l_campaignItr->second.thStatus == TH_ST_REQ_RUN){
-						sleep(1);
-						APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Waiting For Campaign with Campaign ID %u  to Start...", campaignId);
-					}
-				}else{
-					APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "No Entries in Campaign Map For Campaign %u", campaignId);
-				}
-			}else{
-				APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "pthread_create Failed For Campaign %u", campaignId);
-				l_campaignItr = G_smsCampaignMap.find(campaignId);
-				if(l_campaignItr != G_smsCampaignMap.end()){
-					G_smsCampaignMap.erase(l_campaignItr);
-				}
-			}
-		}else{
-			for(l_campaignItr = G_smsCampaignMap.begin(); l_campaignItr != G_smsCampaignMap.end(); l_campaignItr ++){
-				if(l_campaignItr->second.thStatus == TH_ST_STOP){
-					pthread_join(l_campaignItr->second.thId, NULL);
-					APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Removing Campaign %u From Campaign Map", l_campaignItr->second.id);
-					G_smsCampaignMap.erase(l_campaignItr);
-					//break; // bread for loop for erasing one at atime
-				}
-			}
-		}
-		sleep(30);
-	}
 #ifndef WITH_THREAD_POOL
 	Esme::StopSender();
 #endif

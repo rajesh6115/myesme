@@ -58,9 +58,13 @@ class Esme{
 		uint16_t m_port;
 #ifdef WITH_LIBEVENT
 		struct event_base *m_base;
-		struct bufferevent *m_bufferEvent;
+		struct event *m_read_event;
+		struct event *m_write_event;
 		struct event *m_linkCheckEvent;
 		struct timeval m_linkCheckTimerValue;
+		evutil_socket_t m_sd;
+		std::deque<NetBuffer> m_write_buffers;
+		static void write_event_handler( evutil_socket_t fd, short events, void *arg);
 #else
 		int m_esmeSocket;
 		// Regulated Instance Creation
@@ -198,8 +202,7 @@ class Esme{
 		int UnBind(void);
 // If libevent is There There is no need of Separate Reader Thread
 #ifdef WITH_LIBEVENT
-		static void EventCallBack(bufferevent*, short int, void*);
-		static void ReadCallBack(bufferevent*, void*);
+		static void read_event_handler( evutil_socket_t fd, short events, void *arg);
 #else
 		// Reader Having Class Scope
 		static int StartReader(void);
