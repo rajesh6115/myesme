@@ -26,6 +26,9 @@ private:
 	evutil_socket_t m_sd;
 	const std::string m_host;
 	const unsigned short m_port;
+//TODO: 
+//1. Try To Remove NetBuffer With std::vector.
+// As We Can Implement Some Reservation Of Memory To Avoid new and delete always size got change
 	std::deque<NetBuffer> m_write_buffers;
 };
 
