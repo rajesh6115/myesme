@@ -146,8 +146,9 @@ void Esme::OnReceivePdu(void){
 						// UnRegister the pdu
 						this->UnRegisterPdu(tmpNetBuf);
 						this->DoDatabaseUpdate(tmpNetBuf); // for All Data Base Related Insert/Update
-						// Unregister from smsdata
-						this->UnRegisterSmsData(seqNum);
+						if( st == Smpp::CommandStatus::ESME_ROK ){
+							this->UnRegisterSmsData(seqNum);
+						}
 						if(!this->m_isSendSms)
 							this->m_isSendSms = true;
 					}catch(...){
@@ -157,8 +158,8 @@ void Esme::OnReceivePdu(void){
 						// TODO: Resend Logic Should Not Be Here
 						if(this->sendSmsMap.find(seqNum)!= this->sendSmsMap.end()){
 							sms_data_t tmpSms = this->sendSmsMap[seqNum];
-							this->UnRegisterSmsData(seqNum);
-							//usleep(RESEND_USLEEP); // Put Some Sleep To Give Server Little Time
+							//this->UnRegisterSmsData(seqNum); // TODO: why to unregister, if it is same pdu only
+							usleep(RESEND_USLEEP); // Put Some Sleep To Give Server Little Time
 							this->SendSubmitSm(seqNum, tmpSms.party_a, (Smpp::Uint8)tmpSms.src_ton, (Smpp::Uint8)tmpSms.src_npi, tmpSms.party_b, (Smpp::Uint8)tmpSms.dest_ton, (Smpp::Uint8)tmpSms.dest_npi, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
 							//this->SendSms(tmpSms);
 						}else{

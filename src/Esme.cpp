@@ -149,8 +149,6 @@ Esme::Esme(std::string name, std::string cfgFile, struct event_base *base):Esme(
 	if(base != NULL){
 		m_base = base;
 	}
-	//struct event *m_linkCheckEvent;
-        //struct timeval m_linkCheckTimerValue;
 	m_linkCheckEvent = event_new(m_base, -1, EV_PERSIST, &Esme::OnLinkCheckTimeOut, this);
 	m_linkCheckTimerValue.tv_sec = 30;
 	m_linkCheckTimerValue.tv_usec = 0;
@@ -385,26 +383,52 @@ void Esme::write_event_handler( evutil_socket_t fd, short events, void *arg){
                 tempObj = socket_obj_p->m_write_buffers.front();
                 socket_obj_p->m_write_buffers.pop_front();
         }
-        ssize_t ret_val;
-        ret_val = send(fd, tempObj.GetBuffer(), tempObj.GetLength(), 0);
-        if(ret_val == tempObj.GetLength()){
-                tempObj.Erase();
-        }else if (ret_val > 0){
-                tempObj.Erase(0, ret_val);
-                event_add(socket_obj_p->m_write_event, NULL);
-        }else{
-                tempObj.Erase(); // Loss Of Data
-                socket_obj_p->CloseConnection();
-        }
+	while(tempObj.GetLength()){
+		ssize_t ret_val=-1;
+		ret_val = send(fd, tempObj.GetBuffer(), tempObj.GetLength(), 0);
+		if(ret_val == tempObj.GetLength()){
+			tempObj.Erase();
+			if(!socket_obj_p->m_write_buffers.empty()){
+				tempObj = socket_obj_p->m_write_buffers.front();
+		                socket_obj_p->m_write_buffers.pop_front();
+			}else{
+				break;
+			}
+		}else if (ret_val > 0){
+			tempObj.Erase(0, ret_val);
+			event_add(socket_obj_p->m_write_event, NULL);
+			break;
+		}else{
+			tempObj.Erase(); // Loss Of Data
+			socket_obj_p->CloseConnection();
+			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN WRITE EVENT HANDLER DATA LOSS");
+			break;
+		}
+	}
 }
 
 int Esme::Write(NetBuffer &robj){
 	if(m_write_event == NULL){
-                m_write_event = event_new(m_base, m_sd, EV_WRITE, &Esme::write_event_handler, this);
-        }
-	m_write_buffers.push_back(robj);
-	event_add(m_write_event, NULL);
-        return robj.GetLength();
+		m_write_event = event_new(m_base, m_sd, EV_WRITE, &Esme::write_event_handler, this);
+	}
+	ssize_t ret_val;
+	ret_val = send(m_sd, robj.GetBuffer(), robj.GetLength(), 0);
+	if(ret_val == robj.GetLength()){
+		return robj.GetLength();
+	}else if (ret_val > 0){
+		robj.Erase(0, ret_val);
+		m_write_buffers.push_back(robj);
+		event_add(m_write_event, NULL);
+	}else{
+		if(ret_val == EAGAIN || ret_val == EWOULDBLOCK){
+			m_write_buffers.push_back(robj);
+			event_add(m_write_event, NULL);
+		}else{
+			CloseConnection();
+			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN WRITE DATA LOSS");
+		}
+	}
+	return robj.GetLength();
 }
 #endif
 
@@ -989,7 +1013,7 @@ int Esme::DoDatabaseUpdate(NetBuffer &tmpNetBuf){
 					APP_LOGGER(CG_MyAppLogger, LOG_INFO, "QUERYLOG : %s", tmpBuffer);
 				}else{
 					// Log Error
-					std::cerr << "Error in Finding iSNo of a PDU"<< __LINE__ <<std::endl;
+					std::cerr << "Error in Finding iSNo of a PDU"<< sequenceNumber <<std::endl;
 				}
 			}
 			break;
