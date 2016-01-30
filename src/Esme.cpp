@@ -256,7 +256,7 @@ int Esme::OpenConnection(void){
         }
 	evutil_make_socket_nonblocking( m_sd);
 	if( m_read_event == NULL){
-                m_read_event = event_new(m_base, m_sd, EV_READ | EV_PERSIST, &Esme::read_event_handler, this);
+                m_read_event = event_new(m_base, m_sd, EV_READ | EV_PERSIST | EV_ET, &Esme::read_event_handler, this);
         }
         if(m_read_event == NULL){
                 return -1;
@@ -307,19 +307,19 @@ int Esme::CloseConnection(void){
 	if (m_esmeState == ST_IDLE || m_esmeState == ST_NOTCONNECTED){
 		return 0;
 	}
-	 if(m_read_event){
-                event_del(m_read_event);
+        if(m_sd > 0){
+                evutil_closesocket(m_sd);
+                m_sd = -1;
+        }
+	if(m_read_event){
+               // event_del(m_read_event); // giving SEGFAULT. what is prope way to remove pending event???
                 event_free(m_read_event);
                 m_read_event = NULL;
         }
         if(m_write_event){
-                event_del( m_write_event);
+               // event_del( m_write_event); // non persist Event So No need Of Delete
                 event_free(m_write_event);
                 m_write_event = NULL;
-        }
-        if(m_sd > 0){
-                evutil_closesocket(m_sd);
-                m_sd = -1;
         }
 	if(!m_write_buffers.empty()){
                 // Flush Existing Buffers
@@ -399,9 +399,9 @@ void Esme::write_event_handler( evutil_socket_t fd, short events, void *arg){
 			event_add(socket_obj_p->m_write_event, NULL);
 			break;
 		}else{
+			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN WRITE DATA CLOSING SOCKET %d",ret_val);
 			tempObj.Erase(); // Loss Of Data
-			socket_obj_p->CloseConnection();
-			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN WRITE EVENT HANDLER DATA LOSS");
+			socket_obj_p->m_esmeState = Esme::ST_ERROR; // set error and leave it to close by connection manager
 			break;
 		}
 	}
@@ -414,21 +414,24 @@ int Esme::Write(NetBuffer &robj){
 	ssize_t ret_val;
 	ret_val = send(m_sd, robj.GetBuffer(), robj.GetLength(), 0);
 	if(ret_val == robj.GetLength()){
-		return robj.GetLength();
+		return ret_val;
 	}else if (ret_val > 0){
+		// Partially Written So Handle By write_call_back
 		robj.Erase(0, ret_val);
 		m_write_buffers.push_back(robj);
 		event_add(m_write_event, NULL);
 	}else{
 		if(ret_val == EAGAIN || ret_val == EWOULDBLOCK){
-			m_write_buffers.push_back(robj);
-			event_add(m_write_event, NULL);
+			//m_write_buffers.push_back(robj);
+			//event_add(m_write_event, NULL);
+			// Do not Queue It As this may lead to packet loss
+			return -1;
 		}else{
-			CloseConnection();
-			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN WRITE DATA LOSS");
+			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN WRITE DATA CLOSING SOCKET %d",ret_val);
+			m_esmeState = Esme::ST_ERROR; // set error and leave it to close by connection manager
 		}
 	}
-	return robj.GetLength();
+	return ret_val;
 }
 #endif
 
@@ -451,12 +454,16 @@ void Esme::read_event_handler( evutil_socket_t fd, short events, void *arg){
 	Esme *esmeObj = (Esme *) arg;
 	int32_t readBytes;
 	uint8_t readBuffer[MAX_READ_BUFFER_LENGTH];
+	NetBuffer tempBuf;	
+	uint32_t requireBytes = 0; // Smpp::get_command_length((const Smpp::Uint8*)esmeObj->m_readNetBuffer.GetBuffer());
 	memset(readBuffer, 0x00, sizeof(readBuffer));
 	readBytes = recv(fd, readBuffer, sizeof(readBuffer), 0);
-	
-        esmeObj->m_readNetBuffer.Append(readBuffer, readBytes);
-	NetBuffer tempBuf;	
-	uint32_t requireBytes = Smpp::get_command_length((const Smpp::Uint8*)esmeObj->m_readNetBuffer.GetBuffer());
+	if(readBytes > 0){
+        	esmeObj->m_readNetBuffer.Append(readBuffer, readBytes);
+	}
+	if(esmeObj->m_readNetBuffer.GetLength() >= 4){
+		requireBytes = Smpp::get_command_length((const Smpp::Uint8*)esmeObj->m_readNetBuffer.GetBuffer());
+	}
         while( (requireBytes>0) && (requireBytes <= esmeObj->m_readNetBuffer.GetLength()) ){
                 tempBuf.Erase();
                 tempBuf.Append(esmeObj->m_readNetBuffer.GetBuffer(), requireBytes);
@@ -708,9 +715,13 @@ int Esme::SendSubmitSm(uint32_t seqNo, const Smpp::Char *srcAddr, Smpp::Uint8 sr
 	}
 	nwData.Append(pdu.encode(), pdu.command_length());
 	RegisterPdu(nwData);
+	// Write May Failure
 	int noOfByteWritten = Write(nwData);
-	DoDatabaseUpdate(nwData); // Update Database for PDUID
-	return noOfByteWritten;
+	if(noOfByteWritten > 0){
+		DoDatabaseUpdate(nwData); // Update Database for PDUID
+		return 0;
+	}
+	return -1;
 }
 
 int Esme::SendEnquireLink(void){

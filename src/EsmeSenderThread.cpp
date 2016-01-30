@@ -13,14 +13,21 @@ void Esme::SendOneSms(void){
 			pduseq = this->GetNewSequenceNumber();
 			// Register to smsdata
 			this->RegisterSmsData(pduseq, tmpSms);
-			this->SendSubmitSm(pduseq, tmpSms.party_a, tmpSms.src_ton, tmpSms.src_npi, tmpSms.party_b, tmpSms.dest_ton, tmpSms.dest_npi, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
+			if(this->SendSubmitSm(pduseq, tmpSms.party_a, tmpSms.src_ton, tmpSms.src_npi, tmpSms.party_b, tmpSms.dest_ton, tmpSms.dest_npi, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg)) == -1){
+				APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "SendingSubmitSm Fail");
+				// Enque It Again with a small delay
+				if(this->GetEsmeState() == ST_ERROR){
+					usleep(50000); // delay by 50ms
+				}
+				this->SendSms(tmpSms);
+			}
 		}else{
 			APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "No SMS FOR : %s", this->GetEsmeName().c_str());
 		}
 	}else{
 		APP_LOGGER(CG_MyAppLogger, LOG_WARNING, " PAUSE OF SENDING: %s : %u ", this->GetEsmeName().c_str(), this->GetEsmeState());
 		if(this->GetEsmeState() == ST_ERROR){
-			usleep(10000); // delay by 10ms
+			usleep(50000); // delay by 50ms
 		}
 		g_threadPool.enqueue(&Esme::SendOneSms, this); // Enque missed event
 	}
