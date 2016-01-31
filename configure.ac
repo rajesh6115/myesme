@@ -5,7 +5,7 @@ AC_INIT([myesme], [1.0.0], [sahoorajesh.d@gmail.com], [myesme], [https://github.
 # Put autotools auxiliary files in a subdir, so they don't clutter top dir:
 AC_CONFIG_AUX_DIR([build-aux])
 # Initialise Automake with Default version Number and Default CPP flags
-AM_INIT_AUTOMAKE([1.11 -Wall -Werror ])
+AM_INIT_AUTOMAKE([1.11 foreign -Wall -Werror ])
 # Check for some Unique file in the Project
 AC_CONFIG_SRCDIR([src/])
 # Check for C Compiler

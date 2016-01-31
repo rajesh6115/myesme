@@ -28,7 +28,7 @@ addons:
     notification_email: sahoorajesh.d@gmail.com
     build_command_prepend: "autoreconf -i && ./configure && make clean"
     build_command: "make"
-    branch_pattern: master
+    branch_pattern: coverity_scan
     
 before_script:
   - autoreconf -iv
