@@ -4,8 +4,6 @@ env:
    #   via the "travis encrypt" command using the project repo's public key
    - secure: "V9jC7zKYRc-QTXf5OkldrQ"
 language: cpp
-before_script: autoreconf -i && ./configure
-install:
 install:
 - sudo apt-get update
 - sudo apt-get install g++ libtool autoconf automake libmysqlclient-dev exuberant-ctags libxml2-dev pkg-config make
@@ -26,7 +24,7 @@ addons:
         name: "rajesh6115/myesme"
         description: "Build submitted via Travis CI"
     notification_email: sahoorajesh.d@gmail.com
-    build_command_prepend: "./autogen.sh && ./configure && make clean"
-    build_command:   "make -j 4"
+    build_command_prepend: "autoreconf -i && ./configure && make clean"
+    build_command:   "make"
     branch_pattern: coverity_scan
-script: autoreconf -iv && ./configure && make
+script: autoreconf -i && ./configure && make 
