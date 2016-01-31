@@ -4,14 +4,16 @@ env:
    #   via the "travis encrypt" command using the project repo's public key
    - secure: "V9jC7zKYRc-QTXf5OkldrQ"
 language: cpp
-install:
-- sudo apt-get update
-- sudo apt-get install g++ libtool autoconf automake libmysqlclient-dev exuberant-ctags libxml2-dev pkg-config make
-- if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
 
+install:
+  - sudo apt-get update
+  - sudo apt-get install g++ libtool autoconf automake libmysqlclient-dev exuberant-ctags libxml2-dev pkg-config make
+  - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
+  
 compiler: gcc
 os: linux
 sudo: required
+
 addons:
     apt:
     sources:
@@ -27,4 +29,12 @@ addons:
     build_command_prepend: "autoreconf -i && ./configure && make clean"
     build_command:   "make"
     branch_pattern: coverity_scan
+    
+before_script:
+  - autoreconf -iv
+  
 script: autoreconf -i && ./configure && make 
+
+branches:
+  only:
+    - master
