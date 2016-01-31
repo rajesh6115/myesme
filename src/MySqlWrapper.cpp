@@ -201,7 +201,7 @@ int CMySQL::mcfS_getFieldType(int siL_OffSet)
 	}
 	if(tmp)
 		return tmp->type;
-	return NULL;
+	return -1;
 }
 	
 char *CMySQL::mcfS_getFieldName(int siL_OffSet)
