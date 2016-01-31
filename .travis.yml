@@ -1,3 +1,8 @@
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "V9jC7zKYRc-QTXf5OkldrQ"
 language: cpp
 before_script: autoreconf -i && ./configure
 install:
@@ -5,16 +10,23 @@ install:
 - sudo apt-get update
 - sudo apt-get install g++ libtool autoconf automake libmysqlclient-dev exuberant-ctags libxml2-dev pkg-config make
 - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
-- autoreconf -iv
-- ./configure
-- make
+
 compiler: gcc
 os: linux
 sudo: required
 addons:
-      apt:
-        sources:
+    apt:
+    sources:
         - ubuntu-toolchain-r-test
-        packages:
+    packages:
         - gcc-4.8
         - g++-4.8
+    coverity_scan:
+    project:
+        name: "rajesh6115/myesme"
+        description: "Build submitted via Travis CI"
+    notification_email: sahoorajesh.d@gmail.com
+    build_command_prepend: "./autogen.sh && ./configure && make clean"
+    build_command:   "make -j 4"
+    branch_pattern: coverity_scan
+script: autoreconf -iv && ./configure && make
