@@ -15,13 +15,13 @@ os: linux
 sudo: required
 
 addons:
-    apt:
+  apt:
     sources:
         - ubuntu-toolchain-r-test
     packages:
         - gcc-4.8
         - g++-4.8
-    coverity_scan:
+  coverity_scan:
     project:
         name: "rajesh6115/myesme"
         description: "Build submitted via Travis CI"
