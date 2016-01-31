@@ -27,8 +27,8 @@ addons:
         description: "Build submitted via Travis CI"
     notification_email: sahoorajesh.d@gmail.com
     build_command_prepend: "autoreconf -i && ./configure && make clean"
-    build_command:   "make"
-    branch_pattern: coverity_scan
+    build_command: "make"
+    branch_pattern: master
     
 before_script:
   - autoreconf -iv
