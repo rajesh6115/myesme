@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/rajesh6115/myesme.svg?branch=master)](https://travis-ci.org/rajesh6115/myesme)
 This is an ESME Implementation Using SMPP protocol.
 Learing Project Where you can find steps in developing this BULKSMS project.
 
@@ -55,8 +56,3 @@ APPLICATION LOG
 ----------------
 PATH: you can set path in main app config file
 it can be like /var/log/myesme/xxxxxx.log
-
-<a href="https://scan.coverity.com/projects/rajesh6115-myesme">
-  <img alt="Coverity Scan Build Status"
-       src="https://scan.coverity.com/projects/7339/badge.svg"/>
-</a>
