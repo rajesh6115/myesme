@@ -195,18 +195,22 @@ long CMySQL::mcfl_getNumCols()
 
 int CMySQL::mcfS_getFieldType(int siL_OffSet)
 {
-	MYSQL_FIELD *tmp;
+	MYSQL_FIELD *tmp=NULL;
 	if(m_pRecordsetPtr != NULL){
 		tmp = mysql_fetch_field_direct(m_pRecordsetPtr,siL_OffSet);
 	}
-	return tmp->type;
+	if(tmp)
+		return tmp->type;
+	return NULL;
 }
 	
 char *CMySQL::mcfS_getFieldName(int siL_OffSet)
 {
-	MYSQL_FIELD *tmp;
+	MYSQL_FIELD *tmp=NULL;
 	if(m_pRecordsetPtr != NULL){
 		tmp = mysql_fetch_field_direct(m_pRecordsetPtr,siL_OffSet);
 	}
-	return tmp->name;
+	if(tmp)
+		return tmp->name;
+	return NULL;
 }

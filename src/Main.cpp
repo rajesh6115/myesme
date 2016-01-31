@@ -83,12 +83,14 @@ int main(int argc, char *argv[]){
 				}
 			}
 		}else{
-			for(l_campaignItr = G_smsCampaignMap.begin(); l_campaignItr != G_smsCampaignMap.end(); l_campaignItr ++){
+			for(l_campaignItr = G_smsCampaignMap.begin(); l_campaignItr != G_smsCampaignMap.end(); ){
 				if(l_campaignItr->second.thStatus == TH_ST_STOP){
 					pthread_join(l_campaignItr->second.thId, NULL);
 					APP_LOGGER(CG_MyAppLogger, LOG_INFO, "Removing Campaign %u From Campaign Map", l_campaignItr->second.id);
-					G_smsCampaignMap.erase(l_campaignItr);
+					G_smsCampaignMap.erase(l_campaignItr++);
 					//break; // bread for loop for erasing one at atime
+				}else{
+					++l_campaignItr;
 				}
 			}
 		}
