@@ -200,6 +200,7 @@ class Esme{
 		int Bind(Smpp::SystemId sysId, Smpp::Password pass, Smpp::SystemType sysType, Smpp::InterfaceVersion ifVer, Smpp::Ton ton, Smpp::Npi npi, Smpp::AddressRange range, bind_type_t bindType);
 		int SendSubmitSm(uint32_t seqNo, const Smpp::Char *srcAddr, Smpp::Uint8 srcTon, Smpp::Uint8 srcNpi, const Smpp::Char *destAddr, Smpp::Uint8 destTon, Smpp::Uint8 destNpi, uint8_t type, const Smpp::Uint8 *sms, Smpp::Uint32 length);
 		int UnBind(void);
+		int SendUnbindResp(const NetBuffer&);
 // If libevent is There There is no need of Separate Reader Thread
 #ifdef WITH_LIBEVENT
 		static void read_event_handler( evutil_socket_t fd, short events, void *arg);

@@ -291,6 +291,8 @@ int Esme::OpenConnection(void){
 		m_esmeState = ST_CONNECTED;
 	}
 #endif
+	// If connection in OVER FLOW STATE AND GOT DISCONNECTED, So when re connect It Should Start Sending SMS
+	m_isSendSms = true; 
 	return 0;
 }
 
@@ -422,13 +424,11 @@ int Esme::Write(NetBuffer &robj){
 		event_add(m_write_event, NULL);
 	}else{
 		if(ret_val == EAGAIN || ret_val == EWOULDBLOCK){
-			//m_write_buffers.push_back(robj);
-			//event_add(m_write_event, NULL);
-			// Do not Queue It As this may lead to packet loss
 			return -1;
 		}else{
 			APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "ERROR IN WRITE DATA CLOSING SOCKET %d",ret_val);
 			m_esmeState = Esme::ST_ERROR; // set error and leave it to close by connection manager
+			return -1;
 		}
 	}
 	return ret_val;
@@ -611,6 +611,14 @@ int Esme::UnBind(void){
 	RegisterPdu(nwData);
 	return Write(nwData);
 }
+
+int Esme::SendUnbindResp(const NetBuffer &tmp){
+	NetBuffer tmpBuffer;
+	Smpp::UnbindResp resp((Smpp::Uint8 *)tmp.GetBuffer());
+	tmpBuffer.Append(resp.encode(), resp.command_length());
+	return Write(tmpBuffer);
+}
+
 //  changing Signature Because iSN require for Performance
 // TODO:
 // 1. Don't Assume Any thing

@@ -35,7 +35,11 @@ void Esme::OnReceivePdu(void){
 				break;
 			case Smpp::CommandId::Unbind:
 				{
-					// should not receive
+					// Send Unbind Resp
+					SendUnbindResp(tmpNetBuf);
+					this->m_esmeState = ST_UNBIND;
+					Stop(); // Stop The
+					APP_LOGGER(CG_MyAppLogger, LOG_WARNING, "Connection Closing As SMSC Requested : %s", this->GetEsmeName().c_str() );
 				}
 				break;
 			case Smpp::CommandId::BindReceiverResp:
@@ -113,6 +117,7 @@ void Esme::OnReceivePdu(void){
 					APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Enquire Link Response" );
 					this->UnRegisterPdu(tmpNetBuf);
 					// Reset Enquire Link Timer
+					m_isSendSms = true;
 				}
 				break;
 			case Smpp::CommandId::GenericNack:
@@ -153,20 +158,18 @@ void Esme::OnReceivePdu(void){
 							this->m_isSendSms = true;
 					}catch(...){
 						APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "DO NOT SUBMIT MORE WAIT FOR SOME TIME: ERROR %d", pdu.command_status());
-						this->m_isSendSms = false;
+						if(st != Smpp::CommandStatus::ESME_ROK)
+							this->m_isSendSms = false;
 						// Retrive SMS From SMS MAP sendSmsMap
 						// TODO: Resend Logic Should Not Be Here
 						if(this->sendSmsMap.find(seqNum)!= this->sendSmsMap.end()){
 							sms_data_t tmpSms = this->sendSmsMap[seqNum];
-							//this->UnRegisterSmsData(seqNum); // TODO: why to unregister, if it is same pdu only
 							usleep(RESEND_USLEEP); // Put Some Sleep To Give Server Little Time
 							this->SendSubmitSm(seqNum, tmpSms.party_a, (Smpp::Uint8)tmpSms.src_ton, (Smpp::Uint8)tmpSms.src_npi, tmpSms.party_b, (Smpp::Uint8)tmpSms.dest_ton, (Smpp::Uint8)tmpSms.dest_npi, tmpSms.type, (Smpp::Uint8 *)tmpSms.msg, strlen((const char *)tmpSms.msg));
-							//this->SendSms(tmpSms);
 						}else{
 							this->m_isSendSms = true;
 							APP_LOGGER(CG_MyAppLogger, LOG_ERROR, "SMS DATA NOT AVAILABLE FOR %u", seqNum);
 						}
-
 					}
 
 				}
@@ -382,6 +385,7 @@ void *Esme::ThOnReceivePdu(void *arg){
 						{
 							APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Enquire Link Response" );
 							objAddr->UnRegisterPdu(tmpNetBuf);
+							m_isSendSms = true;
 							// Reset Enquire Link Timer
 						}
 						break;
