@@ -18,7 +18,7 @@ int SmsDbInsertConfig::Open(const char *cfgFile){
 int SmsDbInsertConfig::Close(void){
 	appconfig_close(myconfig);
 	myconfig = NULL;
-	retunr 0;
+	return 0;
 }
 
 int SmsDbInsertConfig::Load(const char *cfgFile){
