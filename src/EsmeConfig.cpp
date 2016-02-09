@@ -1,6 +1,9 @@
 #include "EsmeConfig.hpp"
 
 EsmeConfig::~EsmeConfig(void){
+	if(myconfig){
+		Close();
+	}
 }
 
 EsmeConfig::EsmeConfig(const char *cfgFile){
@@ -11,12 +14,13 @@ int EsmeConfig::Open(const char *cfgFile){
 	if(myconfig == NULL){
 		myconfig = appconfig_init();
 	}
-	appconfig_open(myconfig, cfgFile);
+	return appconfig_open(myconfig, cfgFile);
 }
 
 int EsmeConfig::Close(void){
 	appconfig_close(myconfig);
 	myconfig = NULL;
+	return 0;
 }
 
 int EsmeConfig::Load(const char *cfgFile){
@@ -29,10 +33,14 @@ int EsmeConfig::Load(const char *cfgFile){
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "smsc", "ip", value)==0){
                 ip = value;
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "smsc", "port", value)==0){
                 port = atoi(value);
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "smsc", "tps", value)==0){
@@ -41,6 +49,8 @@ int EsmeConfig::Load(const char *cfgFile){
 		if(smsctps == 0){
 			smsctps = 100; // Some Default Value
 		}	
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "smsc", "type", value)==0){
@@ -53,19 +63,27 @@ int EsmeConfig::Load(const char *cfgFile){
                 }else{
 			smscType = BIND_RDONLY; // Default is Receiving
 		}
-	}
+	}else{
+                return -1;
+        }
 	// BIND
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "system_id", value)==0){
 		bindSysId = value;
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "password", value)==0){
 		bindPass = value;
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "system_type", value)==0){
 		bindSysType = value;
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "interface_version", value)==0){
@@ -73,23 +91,33 @@ int EsmeConfig::Load(const char *cfgFile){
 			esmeSmppVersion = Smpp::InterfaceVersion::V50;
 		else 
 			esmeSmppVersion = Smpp::InterfaceVersion::V34; // Default Version for all other
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "ton", value)==0){
 		bindTon = atoi(value);
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "npi", value)==0){
 		bindNpi = atoi(value);
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
 	if(appconfig_getvalue(myconfig, "bind", "address_range", value)==0){
 		bindAddrRange = value;
+        }else{
+                return -1;
         }
 	
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "messagequeue", "updateqryque_name", value)==0){
                 updateQueryQueueName = value;
+        }else{
+                return -1;
         }
         memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "messagequeue", "updateqryque_msg_size", value)==0){
@@ -97,6 +125,8 @@ int EsmeConfig::Load(const char *cfgFile){
                 if (updateQueryQueueMsgSize < 1){
                         updateQueryQueueMsgSize = 256; // Some Default Value
                 }
+        }else{
+                return -1;
         }
 	memset(value, 0x00, sizeof(value));
         if(appconfig_getvalue(myconfig, "messagequeue", "updateqryque_no_of_msg", value)==0){
@@ -104,10 +134,10 @@ int EsmeConfig::Load(const char *cfgFile){
                 if(updateQueryQueueNoOfMsg < 1){
                         updateQueryQueueNoOfMsg = 10; //some Default value
                 }
+        }else{
+                return -1;
         }
-
-	
-	Close();
+	return 0;
 }
 
 

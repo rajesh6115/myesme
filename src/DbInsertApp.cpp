@@ -31,7 +31,7 @@ int main(int argc, char * argv[]){
                 fprintf(stderr, "USAGE: %s <configfile>\n", argv[0]);
                 return 1;
         }else{
-                sprintf(configfile, "%s", argv[1]);
+                snprintf(configfile, 255, "%s", argv[1]);
         }
 	
 	// Open and Read Cofigurations

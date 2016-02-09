@@ -64,7 +64,7 @@ int main(int argc, char *argv[]){
 		fprintf(stderr, "USAGE: %s <configfile>\n", argv[0]);
 		return 1;
 	}else{
-		sprintf(configfile, "%s", argv[1]);
+		snprintf(configfile, 255, "%s", argv[1]);
 	}
 	// Open and Read Cofigurations
 	CG_MyAppConfig.Load(configfile);
@@ -96,14 +96,13 @@ int main(int argc, char *argv[]){
 	Esme::StartLinkCheck();
 #endif
 
-	Esme *tmpSmppConn = NULL;
 	sleep(1);
 	for(int i=0; i< CG_MyAppConfig.GetMaxinumSmppConnection(); i++){
 		APP_LOGGER(CG_MyAppLogger, LOG_DEBUG, "Connection NAME: %s : Config File %s", CG_MyAppConfig.GetSmppConnectionName(i).c_str(), CG_MyAppConfig.GetSmppConnectionConfigFile(i).c_str() ); 
 #ifdef WITH_LIBEVENT
-		tmpSmppConn = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i), base);
+		Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i), base);
 #else
-		tmpSmppConn = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i));
+		Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i));
 #endif
 	}
 	struct event *campaign_check_event;
@@ -123,6 +122,7 @@ int main(int argc, char *argv[]){
 	Esme::StopSender();
 #endif
 	for(int i=0; i< CG_MyAppConfig.GetMaxinumSmppConnection(); i++){
+		Esme *tmpSmppConn = NULL;
 #ifdef WITH_LIBEVENT
 		tmpSmppConn = Esme::GetEsmeInstance(CG_MyAppConfig.GetSmppConnectionName(i), CG_MyAppConfig.GetSmppConnectionConfigFile(i), base);
 #else

@@ -40,6 +40,7 @@ int appconfig_close(appconfig_p conf){
 		free(conf);
 		conf = NULL;
 	}
+	return 0;
 }
 
 int appconfig_module(appconfig_p conf, const char *moduleName, xmlNodePtr *result){
