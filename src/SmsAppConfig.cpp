@@ -8,6 +8,15 @@ SmsAppConfig::~SmsAppConfig(void){
 
 SmsAppConfig::SmsAppConfig(const char *cfgFile){
 	myconfig = appconfig_init();
+	level = 8 ;//LOG_DEFAULT ;
+	interval = 3600;
+	mysqlPort = 3306;
+	noOfCampaign = 10;
+	noOfSmppConnection = 10;
+#ifdef _MESSAGE_QUEUE_UPDATE_
+	updateQueryQueueMsgSize = 256;
+	updateQueryQueueNoOfMsg = 10;
+#endif
 }
 
 int SmsAppConfig::Open(const char *cfgFile){

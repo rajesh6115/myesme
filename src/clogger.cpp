@@ -178,7 +178,7 @@ int logger_close(logger_p log)
 		{
 			fflush(log->fp);
 			fclose(log->fp);
-			log->fp == NULL;
+			log->fp = NULL;
 		}
 		return 0;
 	}

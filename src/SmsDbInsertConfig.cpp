@@ -9,6 +9,11 @@ SmsDbInsertConfig::~SmsDbInsertConfig(void){
 
 SmsDbInsertConfig::SmsDbInsertConfig(const char *cfgFile){
 	myconfig = appconfig_init();
+	level = 8; //LOG_DEFAULT;
+	interval = 3600;
+	mysqlPort = 3306 ;
+	updateQueryQueueMsgSize = 256;
+	updateQueryQueueNoOfMsg = 10;
 }
 
 int SmsDbInsertConfig::Open(const char *cfgFile){

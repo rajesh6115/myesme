@@ -8,6 +8,13 @@ EsmeConfig::~EsmeConfig(void){
 
 EsmeConfig::EsmeConfig(const char *cfgFile){
 	myconfig = appconfig_init();
+	port = 2775;
+	smsctps = 100;
+	smscType = BIND_RDWR;
+#ifdef _MESSAGE_QUEUE_UPDATE_
+	updateQueryQueueMsgSize = 256;
+	updateQueryQueueNoOfMsg = 10;
+#endif
 }
 
 int EsmeConfig::Open(const char *cfgFile){

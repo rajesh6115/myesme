@@ -11,6 +11,7 @@ CMySQL::CMySQL()
 {
 	m_pConnectionPtr = NULL;
 	m_pRecordsetPtr = NULL;
+	m_iReturnValue = -1;
 }
 
 CMySQL::~CMySQL()

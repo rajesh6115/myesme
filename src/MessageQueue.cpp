@@ -122,7 +122,7 @@ bool SysMessageQueue::IsQueueExist(const char *name){
 
 uint32_t SysMessageQueue::Delete(const char *name){
 	int ret = mq_unlink(name);
-	if (ret = 0){
+	if (ret == 0){
 		mesi_mqState = MQ_ST_DELETED;
 		return MQ_ERR_SUCESS;
 	}else{
